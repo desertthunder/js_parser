@@ -1,12 +1,9 @@
 name = "js_parser"
-version = "0.0.1"
-
-# description = ""
-# licences = ["Apache-2.0"]
-# repository = { type = "github", user = "", repo = "" }
+version = "0.0.2"
+description = "A JavaScript parser written in Gleam"
+licences = ["MIT"]
+repository = { type = "github", user = "desertthunder", repo = "js_parser" }
 # links = [{ title = "Website", href = "" }]
-#
-# See https://gleam.run/writing-gleam/gleam-toml/.
 
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
