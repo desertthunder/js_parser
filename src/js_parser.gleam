@@ -1,18 +1,20 @@
 import argv
-import gleam/io
 import simplifile as fs
 
-pub fn read_file(path) -> Nil {
+/// Reads a file and returns either the contents of the file or an empty string
+/// if it's not found
+pub fn read_file(path) -> String {
   case fs.read(from: path) {
-    Ok(c) -> io.print(c)
-    Error(_) -> io.print_error("unable to read file " <> path)
+    Ok(contents) -> contents
+    Error(_) -> ""
   }
-  Nil
 }
 
+/// A cli with a flag, f, that takes a path to a file and returns its string
+/// contents.
 pub fn main() {
   case argv.load().arguments {
-    ["--f", rest] -> read_file(rest)
-    _ -> io.println("no match")
+    ["-f", rest] | ["--f", rest] -> read_file(rest)
+    _ -> "Empty File"
   }
 }

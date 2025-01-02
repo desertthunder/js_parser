@@ -1,3 +1,4 @@
+import gleam/list
 import gleam/string
 import js_parser/predicates
 
@@ -67,6 +68,17 @@ pub type Token {
   KeywordWhile
   KeywordWith
   KeywordYield
+
+  CharSemicolon
+  CharColon
+  CharComma
+  CharOpenBracket
+  CharCloseBracket
+  CharOpenBrace
+  CharCloseBrace
+  CharOpenParen
+  CharCloseParen
+  CharWhitespace(value: String)
 }
 
 pub type Character {
@@ -81,15 +93,6 @@ pub type Character {
   CharPlus
   CharDot
   CharEquals
-  CharSemicolon
-  CharColon
-  CharComma
-  CharOpenParen
-  CharCloseParen
-  CharOpenBrace
-  CharCloseBrace
-  CharOpenBracket
-  CharCloseBracket
 }
 
 pub type ParserState {
@@ -103,6 +106,7 @@ pub fn new_parser_state(input: String) -> ParserState {
 pub fn parse(input: String) -> List(Token) {
   new_parser_state(input)
   |> parse_tokens
+  |> list.reverse
 }
 
 pub fn parse_tokens(state: ParserState) -> List(Token) {
@@ -115,11 +119,10 @@ pub fn parse_tokens(state: ParserState) -> List(Token) {
 
 // TODO: parse_template_literal
 // TODO: parse_comment_or_regex
-// TODO: parse_hashbang
-// TODO: parse_whitespace
+//       parse_hashbang_comment
 // TODO: parse_line_terminator
 // TODO: parse_numeric_literal
-// TODO: "_" | "$" -> parse_identifier
+// TODO:
 // TODO: "#" -> parse_private_identifier
 // TODO: parse_punctuator
 fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
@@ -129,9 +132,21 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
       case grapheme {
         "\"" -> parse_string_literal(new_state, "", "\"")
         "'" -> parse_string_literal(new_state, "", "'")
+        "_" as c | "$" as c -> parse_identifier(new_state, c)
+        ":" -> #(new_state, CharColon)
+        ";" -> #(new_state, CharSemicolon)
+        "," -> #(new_state, CharComma)
+        "{" -> #(new_state, CharOpenBrace)
+        "}" -> #(new_state, CharCloseBrace)
+        "[" -> #(new_state, CharOpenBracket)
+        "]" -> #(new_state, CharCloseBracket)
+        "(" -> #(new_state, CharOpenParen)
+        ")" -> #(new_state, CharCloseParen)
+        " " as c | "\t" as c -> parse_whitespace(new_state, c)
+        "\n" as c | "\r" as c -> #(new_state, LineTerminatorSequence(value: c))
         _ -> {
           case string.pop_grapheme(state.input) {
-            Ok(_) -> parse_identifer(state)
+            Ok(_) -> parse_identifier(state, "")
             Error(_) -> #(state, EOF)
           }
         }
@@ -184,11 +199,7 @@ fn advance_state(state: ParserState, input: String, offset: Int) -> ParserState 
   ParserState(..state, input:, offset:)
 }
 
-// TODO: We need to parse the starting characters of identifiers because
-// $ & _ are valid in JavaScript. Right now this takes a freestanding keyword
-// (i.e. not a keyword) and pulls out the word without matching against any
-// keywords (type Keyword)
-fn parse_identifer(state: ParserState) -> #(ParserState, Token) {
+fn parse_identifier(state: ParserState, acc: String) -> #(ParserState, Token) {
   case state.input {
     "a" as c <> input
     | "b" as c <> input
@@ -218,9 +229,50 @@ fn parse_identifer(state: ParserState) -> #(ParserState, Token) {
     | "z" as c <> input -> {
       let #(new_state, name) =
         advance_state(state, input, state.offset + 1)
-        |> collect_identifier(c, predicates.is_letter)
+        |> collect_identifier(acc <> c, predicates.is_letter)
 
-      #(new_state, IdentifierName(name))
+      case name {
+        "#" as c <> rest -> #(new_state, PrivateIdentifier(value: c <> rest))
+        "await" -> #(new_state, KeywordAwait)
+        "break" -> #(new_state, KeywordBreak)
+        "case" -> #(new_state, KeywordCase)
+        "catch" -> #(new_state, KeywordCatch)
+        "class" -> #(new_state, KeywordClass)
+        "const" -> #(new_state, KeywordConst)
+        "continue" -> #(new_state, KeywordContinue)
+        "debugger" -> #(new_state, KeywordDebugger)
+        "default" -> #(new_state, KeywordDefault)
+        "delete" -> #(new_state, KeywordDelete)
+        "do" -> #(new_state, KeywordDo)
+        "else" -> #(new_state, KeywordElse)
+        "enum" -> #(new_state, KeywordEnum)
+        "export" -> #(new_state, KeywordExport)
+        "extends" -> #(new_state, KeywordExtends)
+        "false" -> #(new_state, KeywordFalse)
+        "finally" -> #(new_state, KeywordFinally)
+        "for" -> #(new_state, KeywordFor)
+        "function" -> #(new_state, KeywordFunction)
+        "if" -> #(new_state, KeywordIf)
+        "import" -> #(new_state, KeywordImport)
+        "in" -> #(new_state, KeywordIn)
+        "instanceof" -> #(new_state, KeywordInstanceof)
+        "new" -> #(new_state, KeywordNew)
+        "null" -> #(new_state, KeywordNull)
+        "return" -> #(new_state, KeywordReturn)
+        "super" -> #(new_state, KeywordSuper)
+        "switch" -> #(new_state, KeywordSwitch)
+        "this" -> #(new_state, KeywordThis)
+        "throw" -> #(new_state, KeywordThrow)
+        "true" -> #(new_state, KeywordTrue)
+        "try" -> #(new_state, KeywordTry)
+        "typeof" -> #(new_state, KeywordTypeof)
+        "var" -> #(new_state, KeywordVar)
+        "void" -> #(new_state, KeywordVoid)
+        "while" -> #(new_state, KeywordWhile)
+        "with" -> #(new_state, KeywordWith)
+        "yield" -> #(new_state, KeywordYield)
+        _ -> #(new_state, IdentifierName(name))
+      }
     }
     _ -> #(state, EOF)
   }
@@ -239,6 +291,20 @@ fn collect_identifier(
           advance_state(state, source, state.offset + 1)
           |> collect_identifier(acc <> grapheme, predicate)
         False -> #(state, acc)
+      }
+  }
+}
+
+fn parse_whitespace(state: ParserState, acc: String) -> #(ParserState, Token) {
+  case string.pop_grapheme(state.input) {
+    Error(_) -> #(state, EOF)
+    Ok(#(grapheme, source)) ->
+      case grapheme {
+        " " | "\t" | "\n" | "\r" ->
+          state
+          |> advance_state(source, state.offset + 1)
+          |> parse_whitespace(acc <> grapheme)
+        _ -> #(state, CharWhitespace(value: acc))
       }
   }
 }
