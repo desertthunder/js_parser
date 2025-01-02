@@ -120,10 +120,8 @@ pub fn parse_tokens(state: ParserState) -> List(Token) {
 // TODO: parse_template_literal
 // TODO: parse_comment_or_regex
 //       parse_hashbang_comment
-// TODO: parse_line_terminator
 // TODO: parse_numeric_literal
 // TODO:
-// TODO: "#" -> parse_private_identifier
 // TODO: parse_punctuator
 fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
   case string.pop_grapheme(state.input) {
@@ -133,6 +131,7 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
         "\"" -> parse_string_literal(new_state, "", "\"")
         "'" -> parse_string_literal(new_state, "", "'")
         "_" as c | "$" as c -> parse_identifier(new_state, c)
+        "/" -> parse_comment_or_regex(new_state)
         ":" -> #(new_state, CharColon)
         ";" -> #(new_state, CharSemicolon)
         "," -> #(new_state, CharComma)
@@ -308,3 +307,132 @@ fn parse_whitespace(state: ParserState, acc: String) -> #(ParserState, Token) {
       }
   }
 }
+
+fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
+  case string.pop_grapheme(state.input) {
+    Ok(#(next_char, input)) -> {
+      case next_char {
+        // Single-line comment: //
+        "/" as c <> _ -> {
+          advance_state(state, input, state.offset + 1)
+          |> advance_state(input, state.offset + 2)
+          // Skip both slashes
+          |> parse_single_line_comment("/" <> c)
+        }
+
+        // Multi-line comment: /*
+        "*" as c <> _ -> {
+          case input {
+            "*" as next_c <> next_source -> {
+              let #(new_state, content) =
+                advance_state(state, next_source, state.offset + 2)
+                |> parse_multi_line_comment("/" <> c <> next_c, fn(end) {
+                  end == "*/"
+                })
+
+              #(new_state, MultiLineComment(content, True))
+            }
+            _ -> {
+              let #(new_state, content) =
+                advance_state(state, input, state.offset + 1)
+                |> parse_multi_line_comment("/" <> c, fn(end) { end == "*/" })
+              #(new_state, MultiLineComment(content, True))
+            }
+          }
+        }
+
+        // Regular expression: /pattern/flags
+        _ -> #(state, EOF)
+      }
+    }
+    Error(_) -> #(state, EOF)
+  }
+}
+
+fn parse_single_line_comment(
+  state: ParserState,
+  result: String,
+) -> #(ParserState, Token) {
+  let #(final_state, content) =
+    collect_while(state, result, predicates.is_end_of_input)
+  #(final_state, SingleLineComment(content))
+}
+
+fn collect_while(
+  state: ParserState,
+  acc: String,
+  predicate: fn(String) -> Bool,
+) -> #(ParserState, String) {
+  case string.pop_grapheme(state.input) {
+    Ok(#(grapheme, input)) -> {
+      case predicate(grapheme) {
+        True -> {
+          let new_state = advance_state(state, input, state.offset + 1)
+          #(new_state, acc)
+        }
+        False -> {
+          state
+          |> advance_state(input, state.offset + 1)
+          |> collect_while(acc <> grapheme, predicate)
+        }
+      }
+    }
+    Error(_) -> #(state, acc)
+  }
+}
+
+fn parse_multi_line_comment(
+  state: ParserState,
+  acc: String,
+  predicate: fn(String) -> Bool,
+) -> #(ParserState, String) {
+  case string.pop_grapheme(state.input) {
+    Ok(#(grapheme, input)) -> {
+      case input {
+        "*/" as c <> source ->
+          case predicate(c) {
+            True -> {
+              let new_state = advance_state(state, source, state.offset + 1)
+              #(new_state, acc <> grapheme <> c)
+            }
+            False -> {
+              let new_state = advance_state(state, input, state.offset + 1)
+              parse_multi_line_comment(new_state, acc <> grapheme, predicate)
+            }
+          }
+        _ -> {
+          let new_state = advance_state(state, input, state.offset + 1)
+          parse_multi_line_comment(new_state, acc <> grapheme, predicate)
+        }
+      }
+    }
+    Error(_) -> #(state, acc)
+  }
+}
+// fn parse_regular_expression(state: ParserState) -> Result(#(ParserState, Token), String) {
+//   // First, we need to determine if this really is a regex
+//   // This requires analyzing the context, but for simplicity, we'll assume
+//   // any forward slash that isn't a comment starts a regex
+
+//   let state = advance_state(state)  // Skip initial /
+//   let #(after_pattern, pattern, pattern_closed) =
+//     collect_until_unescaped_helper(state, "/", "")
+
+//   case pattern_closed {
+//     False -> Ok(#(after_pattern, RegularExpressionLiteral(pattern, False)))
+//     True -> {
+//       // Now collect any flags (letters after the closing slash)
+//       let #(final_state, flags) = collect_while(
+//         after_pattern,
+//         fn(char) { is_letter(char) },
+//       )
+
+//       let full_pattern = case flags {
+//         "" -> pattern
+//         _ -> pattern <> flags
+//       }
+
+//       Ok(#(final_state, RegularExpressionLiteral(full_pattern, True)))
+//     }
+//   }
+// }

@@ -18,3 +18,9 @@ pub fn is_punctuator_start(char: String) -> Bool {
   ]
   list.contains(punctuators, char)
 }
+
+pub fn is_end_of_input(char: String) -> Bool {
+  let line_terminators = ["\n", "\r", "\r\n"]
+
+  list.contains(line_terminators, char)
+}

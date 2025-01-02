@@ -1,0 +1,3 @@
+/*
+ * Go style multiline comment
+*/

@@ -11,7 +11,7 @@ a tool to build ECMA-262 syntax trees for gleam projects.
 ## Installation
 
 ```sh
-gleam add js_parser@1
+gleam add js_parser
 ```
 
 ## Usage

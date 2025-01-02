@@ -18,6 +18,56 @@ pub fn read_file_test() {
   }
 }
 
+pub fn parse_jsdoc_comment_test() {
+  js_parser.read_file("samples/js/jsDocTest.js")
+  |> lexer.parse
+  |> should.equal([
+    lexer.MultiLineComment(
+      "/**\n * @name jsdoc test\n * @description an empty file with a comment\n */",
+      True,
+    ),
+    lexer.LineTerminatorSequence("\n"),
+  ])
+}
+
+pub fn parse_multiline_comment_test() {
+  js_parser.read_file("samples/js/multilineComment.js")
+  |> lexer.parse
+  |> should.equal([
+    lexer.MultiLineComment("/*\n * Go style multiline comment\n*/", True),
+    lexer.LineTerminatorSequence("\n"),
+  ])
+}
+
+pub fn parse_simple_multiline_comment_test() {
+  let input = "/* this is a multiline comment on a single line */"
+
+  input
+  |> lexer.parse
+  |> should.equal([lexer.MultiLineComment(input, True)])
+}
+
+pub fn parse_single_line_comment_with_cr_test() {
+  js_parser.read_file("samples/js/carriageComment.js")
+  |> lexer.parse
+  |> should.equal([
+    lexer.SingleLineComment("// This is a comment"),
+    lexer.SingleLineComment(
+      "// This is another comment separated by a carriage return",
+    ),
+    lexer.SingleLineComment(
+      "// \\n\\n\\n\\r\\r\\r \\r\\n This comment contains line endings",
+    ),
+  ])
+}
+
+pub fn parse_single_line_comment_test() {
+  let input = "// this is a comment"
+  input
+  |> lexer.parse
+  |> should.equal([lexer.SingleLineComment(input)])
+}
+
 pub fn parse_class_with_private_identifier_test() {
   js_parser.read_file("samples/js/privateAttrTest.js")
   |> lexer.parse
@@ -50,7 +100,9 @@ pub fn parse_file_test() {
 }
 
 pub fn const_with_identifier_test() {
-  "const something"
+  let input = "const something"
+
+  input
   |> lexer.parse
   |> should.equal([
     lexer.KeywordConst,
@@ -79,5 +131,6 @@ pub fn parse_string_literal_with_escape_char_test() {
 }
 
 pub fn parse_keyword_name_test() {
-  "await" |> lexer.parse |> should.equal([lexer.KeywordAwait])
+  let input = "await"
+  input |> lexer.parse |> should.equal([lexer.KeywordAwait])
 }
