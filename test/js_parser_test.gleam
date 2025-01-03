@@ -2,7 +2,7 @@ import gleam/list
 import gleam/string
 import gleeunit
 import gleeunit/should
-import js_parser/lexer
+import js_parser
 import simplifile as fs
 
 fn read_file(path) -> String {
@@ -27,44 +27,44 @@ pub fn read_file_test() {
 
 pub fn numeric_literal_integers_test() {
   "1234"
-  |> lexer.parse
-  |> should.equal([lexer.NumericLiteral("1234")])
+  |> js_parser.parse
+  |> should.equal([js_parser.NumericLiteral("1234")])
 }
 
 pub fn numeric_literal_integer_test() {
-  "0" |> lexer.parse |> should.equal([lexer.NumericLiteral("0")])
+  "0" |> js_parser.parse |> should.equal([js_parser.NumericLiteral("0")])
 }
 
 pub fn open_tail_template_literal_with_substition_test() {
   "`open tail template literal with a ${substition} in it"
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.TemplateLiteral([
-      lexer.TemplateHead("open tail template literal with a "),
-      lexer.IdentifierName("substition"),
-      lexer.TemplateTail(" in it", False),
+    js_parser.TemplateLiteral([
+      js_parser.TemplateHead("open tail template literal with a "),
+      js_parser.IdentifierName("substition"),
+      js_parser.TemplateTail(" in it", False),
     ]),
   ])
 }
 
 pub fn closed_tail_template_literal_with_substition_test() {
   "`closed tail template literal with a ${substition} in it`"
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.TemplateLiteral([
-      lexer.TemplateHead("closed tail template literal with a "),
-      lexer.IdentifierName("substition"),
-      lexer.TemplateTail(" in it", True),
+    js_parser.TemplateLiteral([
+      js_parser.TemplateHead("closed tail template literal with a "),
+      js_parser.IdentifierName("substition"),
+      js_parser.TemplateTail(" in it", True),
     ]),
   ])
 }
 
 pub fn no_substition_open_template_literal_test() {
   "`open template literal without a substition"
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.TemplateLiteral([
-      lexer.NoSubstitutionTemplate(
+    js_parser.TemplateLiteral([
+      js_parser.NoSubstitutionTemplate(
         "open template literal without a substition",
         False,
       ),
@@ -74,10 +74,10 @@ pub fn no_substition_open_template_literal_test() {
 
 pub fn no_substition_closed_template_literal_test() {
   "`closed template literal without a substition`"
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.TemplateLiteral([
-      lexer.NoSubstitutionTemplate(
+    js_parser.TemplateLiteral([
+      js_parser.NoSubstitutionTemplate(
         "closed template literal without a substition",
         True,
       ),
@@ -87,28 +87,28 @@ pub fn no_substition_closed_template_literal_test() {
 
 pub fn empty_template_literal_test() {
   "``"
-  |> lexer.parse
-  |> should.equal([lexer.TemplateLiteral([lexer.EmptyTemplateLiteral])])
+  |> js_parser.parse
+  |> should.equal([js_parser.TemplateLiteral([js_parser.EmptyTemplateLiteral])])
 }
 
 pub fn parse_jsdoc_comment_test() {
   read_file("samples/js/jsDocTest.js")
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.MultiLineComment(
+    js_parser.MultiLineComment(
       "/**\n * @name jsdoc test\n * @description an empty file with a comment\n */",
       True,
     ),
-    lexer.LineTerminatorSequence("\n"),
+    js_parser.LineTerminatorSequence("\n"),
   ])
 }
 
 pub fn parse_multiline_comment_test() {
   read_file("samples/js/multilineComment.js")
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.MultiLineComment("/*\n * Go style multiline comment\n*/", True),
-    lexer.LineTerminatorSequence("\n"),
+    js_parser.MultiLineComment("/*\n * Go style multiline comment\n*/", True),
+    js_parser.LineTerminatorSequence("\n"),
   ])
 }
 
@@ -116,19 +116,19 @@ pub fn parse_simple_multiline_comment_test() {
   let input = "/* this is a multiline comment on a single line */"
 
   input
-  |> lexer.parse
-  |> should.equal([lexer.MultiLineComment(input, True)])
+  |> js_parser.parse
+  |> should.equal([js_parser.MultiLineComment(input, True)])
 }
 
 pub fn parse_single_line_comment_with_cr_test() {
   read_file("samples/js/carriageComment.js")
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.SingleLineComment("// This is a comment"),
-    lexer.SingleLineComment(
+    js_parser.SingleLineComment("// This is a comment"),
+    js_parser.SingleLineComment(
       "// This is another comment separated by a carriage return",
     ),
-    lexer.SingleLineComment(
+    js_parser.SingleLineComment(
       "// \\n\\n\\n\\r\\r\\r \\r\\n This comment contains line endings",
     ),
   ])
@@ -137,38 +137,38 @@ pub fn parse_single_line_comment_with_cr_test() {
 pub fn parse_single_line_comment_test() {
   let input = "// this is a comment"
   input
-  |> lexer.parse
-  |> should.equal([lexer.SingleLineComment(input)])
+  |> js_parser.parse
+  |> should.equal([js_parser.SingleLineComment(input)])
 }
 
 pub fn parse_class_with_private_identifier_test() {
   read_file("samples/js/privateAttrTest.js")
-  |> lexer.parse
-  |> list.contains(lexer.PrivateIdentifier(value: "#privateInformation"))
+  |> js_parser.parse
+  |> list.contains(js_parser.PrivateIdentifier(value: "#privateInformation"))
 }
 
 pub fn parse_file_test() {
   read_file("samples/js/parseFileTest.js")
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.KeywordExport,
-    lexer.CharWhitespace(" "),
-    lexer.KeywordFunction,
-    lexer.CharWhitespace(" "),
-    lexer.IdentifierName("someFunction"),
-    lexer.CharOpenParen,
-    lexer.CharCloseParen,
-    lexer.CharWhitespace(" "),
-    lexer.CharOpenBrace,
-    lexer.LineTerminatorSequence("\n"),
-    lexer.CharWhitespace("    "),
-    lexer.IdentifierName("let"),
-    lexer.CharWhitespace(" "),
-    lexer.IdentifierName("someVar"),
-    lexer.CharSemicolon,
-    lexer.LineTerminatorSequence("\n"),
-    lexer.CharCloseBrace,
-    lexer.LineTerminatorSequence("\n"),
+    js_parser.KeywordExport,
+    js_parser.CharWhitespace(" "),
+    js_parser.KeywordFunction,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("someFunction"),
+    js_parser.CharOpenParen,
+    js_parser.CharCloseParen,
+    js_parser.CharWhitespace(" "),
+    js_parser.CharOpenBrace,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.IdentifierName("let"),
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("someVar"),
+    js_parser.CharSemicolon,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharCloseBrace,
+    js_parser.LineTerminatorSequence("\n"),
   ])
 }
 
@@ -176,34 +176,36 @@ pub fn const_with_identifier_test() {
   let input = "const something"
 
   input
-  |> lexer.parse
+  |> js_parser.parse
   |> should.equal([
-    lexer.KeywordConst,
-    lexer.CharWhitespace(value: " "),
-    lexer.IdentifierName(value: "something"),
+    js_parser.KeywordConst,
+    js_parser.CharWhitespace(value: " "),
+    js_parser.IdentifierName(value: "something"),
   ])
 }
 
 pub fn double_quote_string_literal_test() {
   let input = "\"ok\""
   input
-  |> lexer.parse
-  |> should.equal([lexer.StringLiteral("ok", True)])
+  |> js_parser.parse
+  |> should.equal([js_parser.StringLiteral("ok", True)])
 }
 
 pub fn single_quote_string_literal_test() {
   let input = "'ok'"
   input
-  |> lexer.parse
-  |> should.equal([lexer.StringLiteral("ok", True)])
+  |> js_parser.parse
+  |> should.equal([js_parser.StringLiteral("ok", True)])
 }
 
 pub fn parse_string_literal_with_escape_char_test() {
   let input = "'ok\tbro'"
-  input |> lexer.parse |> should.equal([lexer.StringLiteral("ok\tbro", True)])
+  input
+  |> js_parser.parse
+  |> should.equal([js_parser.StringLiteral("ok\tbro", True)])
 }
 
 pub fn parse_keyword_name_test() {
   let input = "await"
-  input |> lexer.parse |> should.equal([lexer.KeywordAwait])
+  input |> js_parser.parse |> should.equal([js_parser.KeywordAwait])
 }
