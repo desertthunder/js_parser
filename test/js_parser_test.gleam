@@ -25,6 +25,16 @@ pub fn read_file_test() {
   }
 }
 
+pub fn numeric_literal_integers_test() {
+  "1234"
+  |> lexer.parse
+  |> should.equal([lexer.NumericLiteral("1234")])
+}
+
+pub fn numeric_literal_integer_test() {
+  "0" |> lexer.parse |> should.equal([lexer.NumericLiteral("0")])
+}
+
 pub fn open_tail_template_literal_with_substition_test() {
   "`open tail template literal with a ${substition} in it"
   |> lexer.parse

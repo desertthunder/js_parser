@@ -127,46 +127,67 @@ pub fn append_token(state, token) -> ParserState {
   ParserState(..state, tokens: [token, ..state.tokens])
 }
 
-// TODO: parse_template_literal
-// TODO: parse_comment_or_regex
-//       parse_hashbang_comment
-// TODO: parse_numeric_literal
-// TODO:
-// TODO: parse_punctuator
 fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
-  case string.pop_grapheme(state.input) {
-    Ok(#(grapheme, input)) -> {
-      let new_state = advance_state(state, input, state.offset + 1)
-      case grapheme {
-        "\"" -> parse_string_literal(new_state, "", "\"")
-        "'" -> parse_string_literal(new_state, "", "'")
-        "`" -> {
-          let #(temp_state, temp_tokens) = parse_template_literal(new_state, [])
-          #(temp_state, TemplateLiteral(temp_tokens |> list.reverse))
-        }
-        "_" as c | "$" as c -> parse_identifier(new_state, c)
-        "/" -> parse_comment_or_regex(new_state)
-        ":" -> #(new_state, CharColon)
-        ";" -> #(new_state, CharSemicolon)
-        "," -> #(new_state, CharComma)
-        "{" -> #(new_state, CharOpenBrace)
-        "}" -> #(new_state, CharCloseBrace)
-        "[" -> #(new_state, CharOpenBracket)
-        "]" -> #(new_state, CharCloseBracket)
-        "(" -> #(new_state, CharOpenParen)
-        ")" -> #(new_state, CharCloseParen)
-        " " as c | "\t" as c -> parse_whitespace(new_state, c)
-        "\n" as c | "\r" as c -> #(new_state, LineTerminatorSequence(value: c))
-        _ -> {
-          case string.pop_grapheme(state.input) {
-            Ok(_) -> parse_identifier(state, "")
-            Error(_) -> #(state, EOF)
-          }
-        }
-      }
+  case state.input {
+    "" -> #(state, EOF)
+    "\"" <> rest ->
+      advance_state(state, rest, state.offset + 1)
+      |> parse_string_literal("", "\"")
+    "'" <> rest ->
+      advance_state(state, rest, state.offset + 1)
+      |> parse_string_literal("", "'")
+    "`" <> rest -> {
+      let #(temp_state, temp_tokens) =
+        advance_state(state, rest, state.offset + 1)
+        |> parse_template_literal([])
+      #(temp_state, TemplateLiteral(temp_tokens |> list.reverse))
     }
-    Error(_) -> #(state, EOF)
+    "_" as c <> rest | "$" as c <> rest ->
+      advance_state(state, rest, state.offset + 1)
+      |> parse_identifier(c)
+    "/" <> rest ->
+      advance_state(state, rest, state.offset + 1) |> parse_comment_or_regex
+    ":" <> rest -> advance_and_collect(state, rest, CharColon)
+    ";" <> rest -> advance_and_collect(state, rest, CharSemicolon)
+    "," <> rest -> advance_and_collect(state, rest, CharComma)
+    "{" <> rest -> advance_and_collect(state, rest, CharOpenBrace)
+    "}" <> rest -> advance_and_collect(state, rest, CharCloseBrace)
+    "[" <> rest -> advance_and_collect(state, rest, CharOpenBracket)
+    "]" <> rest -> advance_and_collect(state, rest, CharCloseBracket)
+    "(" <> rest -> advance_and_collect(state, rest, CharOpenParen)
+    ")" <> rest -> advance_and_collect(state, rest, CharCloseParen)
+    " " as c <> rest | "\t" as c <> rest ->
+      advance_state(state, rest, state.offset + 1)
+      |> parse_whitespace(c)
+    "\n" as c <> rest | "\r" as c <> rest ->
+      advance_and_collect(state, rest, LineTerminatorSequence(value: c))
+    "0" as c <> rest
+    | "1" as c <> rest
+    | "2" as c <> rest
+    | "3" as c <> rest
+    | "4" as c <> rest
+    | "5" as c <> rest
+    | "6" as c <> rest
+    | "7" as c <> rest
+    | "8" as c <> rest
+    | "9" as c <> rest -> {
+      advance_state(state, rest, state.offset + 1) |> parse_numeric_literal(c)
+    }
+    _ -> {
+      let assert Ok(#(grapheme, input)) = string.pop_grapheme(state.input)
+      advance_state(state, input, state.offset + 1)
+      |> parse_identifier(grapheme)
+    }
   }
+}
+
+fn advance_and_collect(
+  state: ParserState,
+  input: String,
+  token: Token,
+) -> #(ParserState, Token) {
+  let new_state = advance_state(state, input, state.offset + 1)
+  #(new_state, token)
 }
 
 // TODO: Unterminated string literals
@@ -292,6 +313,7 @@ fn parse_identifier(state: ParserState, acc: String) -> #(ParserState, Token) {
   }
 }
 
+// TODO: Consider combining with collect_while
 fn collect_identifier(
   state: ParserState,
   acc: String,
@@ -324,43 +346,38 @@ fn parse_whitespace(state: ParserState, acc: String) -> #(ParserState, Token) {
 }
 
 fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
-  case string.pop_grapheme(state.input) {
-    Ok(#(next_char, input)) -> {
-      case next_char {
-        // Single-line comment: //
-        "/" as c <> _ -> {
-          advance_state(state, input, state.offset + 1)
-          |> advance_state(input, state.offset + 2)
-          // Skip both slashes
-          |> parse_single_line_comment("/" <> c)
+  case state.input {
+    // Single-line comment: //
+    "/" as c <> input -> {
+      advance_state(state, input, state.offset + 1)
+      |> advance_state(input, state.offset + 2)
+      // Skip both slashes
+      |> parse_single_line_comment("/" <> c)
+    }
+
+    // Multi-line comment: /*
+    "*" as c <> input -> {
+      case input {
+        "*" as next_c <> next_source -> {
+          let #(new_state, content) =
+            advance_state(state, next_source, state.offset + 2)
+            |> parse_multi_line_comment("/" <> c <> next_c, fn(end) {
+              end == "*/"
+            })
+
+          #(new_state, MultiLineComment(content, True))
         }
-
-        // Multi-line comment: /*
-        "*" as c <> _ -> {
-          case input {
-            "*" as next_c <> next_source -> {
-              let #(new_state, content) =
-                advance_state(state, next_source, state.offset + 2)
-                |> parse_multi_line_comment("/" <> c <> next_c, fn(end) {
-                  end == "*/"
-                })
-
-              #(new_state, MultiLineComment(content, True))
-            }
-            _ -> {
-              let #(new_state, content) =
-                advance_state(state, input, state.offset + 1)
-                |> parse_multi_line_comment("/" <> c, fn(end) { end == "*/" })
-              #(new_state, MultiLineComment(content, True))
-            }
-          }
+        _ -> {
+          let #(new_state, content) =
+            advance_state(state, input, state.offset + 1)
+            |> parse_multi_line_comment("/" <> c, fn(end) { end == "*/" })
+          #(new_state, MultiLineComment(content, True))
         }
-
-        // Regular expression: /pattern/flags
-        _ -> #(state, EOF)
       }
     }
-    Error(_) -> #(state, EOF)
+
+    // Regular expression: /pattern/flags
+    _ -> #(state, EOF)
   }
 }
 
@@ -533,14 +550,6 @@ fn parse_template_literal(
   }
 }
 
-// fn peek_char() {
-//   todo
-// }
-
-// fn peek_tail() {
-//   todo
-// }
-
 // Recursively parse the substition until we reach the }
 fn collect_until_close(
   state: ParserState,
@@ -574,30 +583,32 @@ fn collect_until_close(
     }
   }
 }
-// fn parse_regular_expression(state: ParserState) -> Result(#(ParserState, Token), String) {
-//   // First, we need to determine if this really is a regex
-//   // This requires analyzing the context, but for simplicity, we'll assume
-//   // any forward slash that isn't a comment starts a regex
 
-//   let state = advance_state(state)  // Skip initial /
-//   let #(after_pattern, pattern, pattern_closed) =
-//     collect_until_unescaped_helper(state, "/", "")
-
-//   case pattern_closed {
-//     False -> Ok(#(after_pattern, RegularExpressionLiteral(pattern, False)))
-//     True -> {
-//       // Now collect any flags (letters after the closing slash)
-//       let #(final_state, flags) = collect_while(
-//         after_pattern,
-//         fn(char) { is_letter(char) },
-//       )
-
-//       let full_pattern = case flags {
-//         "" -> pattern
-//         _ -> pattern <> flags
-//       }
-
-//       Ok(#(final_state, RegularExpressionLiteral(full_pattern, True)))
-//     }
-//   }
-// }
+fn parse_numeric_literal(
+  state: ParserState,
+  acc: String,
+) -> #(ParserState, Token) {
+  case state.input {
+    "0" as c <> rest
+    | "1" as c <> rest
+    | "2" as c <> rest
+    | "3" as c <> rest
+    | "4" as c <> rest
+    | "5" as c <> rest
+    | "6" as c <> rest
+    | "7" as c <> rest
+    | "8" as c <> rest
+    | "9" as c <> rest ->
+      advance_state(state, rest, state.offset + 1)
+      |> parse_numeric_literal(acc <> c)
+    c ->
+      case predicates.is_digit(c) {
+        True -> {
+          #(state, NumericLiteral(acc <> c))
+        }
+        False -> {
+          #(state, NumericLiteral(acc))
+        }
+      }
+  }
+}
