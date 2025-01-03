@@ -3,32 +3,25 @@ import gleam/string
 import js_parser/predicates
 
 pub type Token {
-  // String Literals
   StringLiteral(value: String, closed: Bool)
 
-  // Template Literals
   TemplateLiteral(components: List(Token))
   EmptyTemplateLiteral
-
-  // TemplateSubstition
   NoSubstitutionTemplate(value: String, closed: Bool)
   TemplateHead(value: String)
   TemplateMiddle(value: String)
   TemplateTail(value: String, closed: Bool)
 
-  // Regex
   RegularExpressionLiteral(value: String, closed: Bool)
-  // Comments
   SingleLineComment(value: String)
   MultiLineComment(value: String, closed: Bool)
+  // TODO
   HashbangComment(value: String)
-  // Identifers
+
   IdentifierName(value: String)
   PrivateIdentifier(value: String)
 
-  // Numbers
   NumericLiteral(value: String)
-  // Special
   WhiteSpace(value: String)
   LineTerminatorSequence(value: String)
 
@@ -92,6 +85,8 @@ pub type Token {
   CharMinus
   CharPlus
   CharEquals
+  CharMod
+  CharBackslash
 
   PlusAssign
   MinusAssign
@@ -105,15 +100,36 @@ pub type Token {
   ShlAssign
   ShrAssign
   UshrAssign
-}
 
-pub type Character {
-  CharHashbang
-  CharBacktick
-  CharSingleQuote
-  CharDoubleQuote
-  CharForwardSlash
-  CharBackslash
+  OperatorExp
+  OperatorIncrement
+  OperatorDecrement
+
+  OperatorAND
+  OperatorOR
+  OperatorXOR
+  OperatorSHL
+  OperatorSHR
+  OperatorUSHR
+  OperatorNOT
+
+  OperatorLogicalAND
+  OperatorLogicalOR
+  OperatorLogicalNOT
+  OperatorNULLISH
+
+  ComparisonEQL
+  ComparisonNotEQL
+  ComparisonStrictEQL
+  ComparisonStrictNotEQL
+  LT
+  GT
+  LTE
+  GTE
+
+  Arrow
+  CharQuestion
+  OperatorOptional
 }
 
 pub type ParserState {
@@ -130,16 +146,12 @@ pub fn parse(input: String) -> List(Token) {
   |> list.reverse
 }
 
-pub fn parse_tokens(state: ParserState) -> List(Token) {
+fn parse_tokens(state: ParserState) -> List(Token) {
   case parse_next_token(state) {
     #(_, EOF) -> state.tokens
     #(state, token) ->
       parse_tokens(ParserState(..state, tokens: [token, ..state.tokens]))
   }
-}
-
-pub fn append_token(state, token) -> ParserState {
-  ParserState(..state, tokens: [token, ..state.tokens])
 }
 
 fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
@@ -160,39 +172,81 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
     "_" as c <> rest | "$" as c <> rest ->
       advance_state(state, rest, state.offset + 1)
       |> parse_identifier(c)
-    "/" <> rest ->
-      advance_state(state, rest, state.offset + 1) |> parse_comment_or_regex
-    ":" <> rest -> advance_and_collect(state, rest, CharColon)
-    ";" <> rest -> advance_and_collect(state, rest, CharSemicolon)
-    "," <> rest -> advance_and_collect(state, rest, CharComma)
-    "{" <> rest -> advance_and_collect(state, rest, CharOpenBrace)
-    "}" <> rest -> advance_and_collect(state, rest, CharCloseBrace)
-    "[" <> rest -> advance_and_collect(state, rest, CharOpenBracket)
-    "]" <> rest -> advance_and_collect(state, rest, CharCloseBracket)
-    "(" <> rest -> advance_and_collect(state, rest, CharOpenParen)
-    ")" <> rest -> advance_and_collect(state, rest, CharCloseParen)
-    "+=" <> rest -> advance_and_collect(state, rest, Punctuator(PlusAssign))
-    "-=" <> rest -> advance_and_collect(state, rest, Punctuator(MinusAssign))
-    "*=" <> rest -> advance_and_collect(state, rest, Punctuator(StarAssign))
-    "/=" <> rest -> advance_and_collect(state, rest, Punctuator(DivAssign))
-    "%=" <> rest -> advance_and_collect(state, rest, Punctuator(ModAssign))
-    "**=" <> rest -> advance_and_collect(state, rest, Punctuator(ExpAssign))
-    "&=" <> rest -> advance_and_collect(state, rest, Punctuator(AndAssign))
-    "|=" <> rest -> advance_and_collect(state, rest, Punctuator(OrAssign))
-    "^=" <> rest -> advance_and_collect(state, rest, Punctuator(XorAssign))
-    "<<=" <> rest -> advance_and_collect(state, rest, Punctuator(ShlAssign))
-    ">>=" <> rest -> advance_and_collect(state, rest, Punctuator(ShrAssign))
-    ">>>=" <> rest -> advance_and_collect(state, rest, Punctuator(UshrAssign))
-    "=" <> rest -> advance_and_collect(state, rest, Punctuator(CharEquals))
-    "*" <> rest -> advance_and_collect(state, rest, Punctuator(CharAsterisk))
-    "-" <> rest -> advance_and_collect(state, rest, Punctuator(CharMinus))
-    "+" <> rest -> advance_and_collect(state, rest, Punctuator(CharPlus))
-    "." <> rest -> advance_and_collect(state, rest, CharDot)
+    "/" <> _ -> parse_comment_or_regex(state)
+    ":" <> rest -> advance_and_collect(state, rest, 1, CharColon)
+    ";" <> rest -> advance_and_collect(state, rest, 1, CharSemicolon)
+    "," <> rest -> advance_and_collect(state, rest, 1, CharComma)
+    "{" <> rest -> advance_and_collect(state, rest, 1, CharOpenBrace)
+    "}" <> rest -> advance_and_collect(state, rest, 1, CharCloseBrace)
+    "[" <> rest -> advance_and_collect(state, rest, 1, CharOpenBracket)
+    "]" <> rest -> advance_and_collect(state, rest, 1, CharCloseBracket)
+    "(" <> rest -> advance_and_collect(state, rest, 1, CharOpenParen)
+    ")" <> rest -> advance_and_collect(state, rest, 1, CharCloseParen)
+    "+=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(PlusAssign))
+    "-=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(MinusAssign))
+    "*=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(StarAssign))
+    "/=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(DivAssign))
+    "%=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(ModAssign))
+    "**=" <> rest -> advance_and_collect(state, rest, 3, Punctuator(ExpAssign))
+    "&=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(AndAssign))
+    "|=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(OrAssign))
+    "^=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(XorAssign))
+    "<<=" <> rest -> advance_and_collect(state, rest, 3, Punctuator(ShlAssign))
+    ">>=" <> rest -> advance_and_collect(state, rest, 3, Punctuator(ShrAssign))
+    ">>>=" <> rest ->
+      advance_and_collect(state, rest, 4, Punctuator(UshrAssign))
+    "**" <> rest -> advance_and_collect(state, rest, 2, Punctuator(OperatorExp))
+    "++" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(OperatorIncrement))
+    "--" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(OperatorDecrement))
+    "&&" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(OperatorLogicalAND))
+    "||" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(OperatorLogicalOR))
+    "??" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(OperatorNULLISH))
+    "!" <> rest ->
+      advance_and_collect(state, rest, 1, Punctuator(OperatorLogicalNOT))
+    "&" <> rest -> advance_and_collect(state, rest, 1, Punctuator(OperatorAND))
+    "|" <> rest -> advance_and_collect(state, rest, 1, Punctuator(OperatorOR))
+    "^" <> rest -> advance_and_collect(state, rest, 1, Punctuator(OperatorXOR))
+    "~" <> rest -> advance_and_collect(state, rest, 1, Punctuator(OperatorNOT))
+    "<<" <> rest -> advance_and_collect(state, rest, 2, Punctuator(OperatorSHL))
+    ">>" <> rest -> advance_and_collect(state, rest, 2, Punctuator(OperatorSHR))
+    ">>>" <> rest ->
+      advance_and_collect(state, rest, 3, Punctuator(OperatorUSHR))
+    "?" <> rest -> advance_and_collect(state, rest, 1, Punctuator(CharQuestion))
+    "?." <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(OperatorOptional))
+    "=>" <> rest -> advance_and_collect(state, rest, 2, Punctuator(Arrow))
+    "==" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(ComparisonEQL))
+    "===" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(ComparisonStrictEQL))
+    "!=" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(ComparisonNotEQL))
+    "!==" <> rest ->
+      advance_and_collect(state, rest, 2, Punctuator(ComparisonStrictNotEQL))
+    "<" <> rest -> advance_and_collect(state, rest, 1, Punctuator(LT))
+    ">" <> rest -> advance_and_collect(state, rest, 1, Punctuator(GT))
+    "<=" <> rest -> advance_and_collect(state, rest, 1, Punctuator(LTE))
+    ">=" <> rest -> advance_and_collect(state, rest, 1, Punctuator(GTE))
+    "=" <> rest -> {
+      advance_and_collect(state, rest, 1, Punctuator(CharEquals))
+    }
+    "*" <> rest -> advance_and_collect(state, rest, 1, Punctuator(CharAsterisk))
+    "-" <> rest -> advance_and_collect(state, rest, 1, Punctuator(CharMinus))
+    "+" <> rest -> {
+      advance_and_collect(state, rest, 1, Punctuator(CharPlus))
+    }
+    "%" <> rest -> advance_and_collect(state, rest, 1, Punctuator(CharMod))
+    "." <> rest -> advance_and_collect(state, rest, 1, CharDot)
     " " as c <> rest | "\t" as c <> rest ->
       advance_state(state, rest, state.offset + 1)
       |> parse_whitespace(c)
     "\n" as c <> rest | "\r" as c <> rest ->
-      advance_and_collect(state, rest, LineTerminatorSequence(value: c))
+      advance_and_collect(state, rest, 1, LineTerminatorSequence(value: c))
     "0" as c <> rest
     | "1" as c <> rest
     | "2" as c <> rest
@@ -216,9 +270,10 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
 fn advance_and_collect(
   state: ParserState,
   input: String,
+  move_by: Int,
   token: Token,
 ) -> #(ParserState, Token) {
-  let new_state = advance_state(state, input, state.offset + 1)
+  let new_state = advance_state(state, input, state.offset + move_by)
   #(new_state, token)
 }
 
@@ -343,7 +398,14 @@ fn parse_identifier(state: ParserState, acc: String) -> #(ParserState, Token) {
         _ -> #(new_state, IdentifierName(name))
       }
     }
-    _ -> #(state, EOF)
+    _ -> {
+      case predicates.is_identifier_char(acc) {
+        True -> {
+          #(state, IdentifierName(acc))
+        }
+        False -> #(state, EOF)
+      }
+    }
   }
 }
 
@@ -365,6 +427,7 @@ fn collect_identifier(
   }
 }
 
+/// Collects a sequence of whitespace characters
 fn parse_whitespace(state: ParserState, acc: String) -> #(ParserState, Token) {
   case string.pop_grapheme(state.input) {
     Error(_) -> #(state, EOF)
@@ -379,42 +442,43 @@ fn parse_whitespace(state: ParserState, acc: String) -> #(ParserState, Token) {
   }
 }
 
+/// Handles single and multiline comments and the division operator
 fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
   case state.input {
     // Single-line comment: //
-    "/" as c <> input -> {
-      advance_state(state, input, state.offset + 1)
-      |> advance_state(input, state.offset + 2)
+    "//" as c <> input -> {
+      advance_state(state, input, state.offset + 2)
       // Skip both slashes
-      |> parse_single_line_comment("/" <> c)
+      |> parse_single_line_comment(c)
     }
 
     // Multi-line comment: /*
-    "*" as c <> input -> {
+    "/*" as c <> input -> {
       case input {
         "*" as next_c <> next_source -> {
           let #(new_state, content) =
-            advance_state(state, next_source, state.offset + 2)
-            |> parse_multi_line_comment("/" <> c <> next_c, fn(end) {
-              end == "*/"
-            })
+            advance_state(state, next_source, state.offset + 3)
+            |> parse_multi_line_comment(c <> next_c, fn(end) { end == "*/" })
 
           #(new_state, MultiLineComment(content, True))
         }
         _ -> {
           let #(new_state, content) =
-            advance_state(state, input, state.offset + 1)
-            |> parse_multi_line_comment("/" <> c, fn(end) { end == "*/" })
+            advance_state(state, input, state.offset + 2)
+            |> parse_multi_line_comment(c, fn(end) { end == "*/" })
           #(new_state, MultiLineComment(content, True))
         }
       }
     }
+
+    "/" <> input -> advance_and_collect(state, input, 1, CharBackslash)
 
     // Regular expression: /pattern/flags
     _ -> #(state, EOF)
   }
 }
 
+/// Collects a single line comment based on the end of input predicate
 fn parse_single_line_comment(
   state: ParserState,
   result: String,
@@ -424,6 +488,10 @@ fn parse_single_line_comment(
   #(final_state, SingleLineComment(content))
 }
 
+/// Collects a sequence of characters for a token with a value field
+/// until it reaches the end of the file, usually signifying an
+/// unterminated sequence, based on the predicate function provided by
+/// the caller.
 fn collect_while(
   state: ParserState,
   acc: String,
@@ -477,6 +545,10 @@ fn parse_multi_line_comment(
   }
 }
 
+/// Similar to collect_while but instead includes the character
+/// used by the predicate function (the end of the sequence usually)
+/// so that the template literal collector is aware of which portion
+/// of the template the parser is working through (i.e. head, middle, tail)
 fn collect_until(
   state: ParserState,
   acc: String,
@@ -501,8 +573,12 @@ fn collect_until(
   }
 }
 
-// Template literals are wrapped around a list of Tokens
-// because of the variation in their structure.
+/// Collects a template literal and wraps the collected tokens in a
+/// TemplateLiteral token.
+///
+/// Note that that template literals are wrapped around a list of Tokens
+/// because of the variation in their structure (head, middle, tail) and
+/// because substitions can be valid JavaScript expressions.
 fn parse_template_literal(
   state: ParserState,
   acc: List(Token),
@@ -584,7 +660,9 @@ fn parse_template_literal(
   }
 }
 
-// Recursively parse the substition until we reach the }
+/// A helper function used to collect the tokens within a template literal
+/// substition. It recursively parses the substition until reaching the }
+/// character
 fn collect_until_close(
   state: ParserState,
   acc: List(Token),

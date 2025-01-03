@@ -3,71 +3,75 @@
 ## Road to v0.3.0
 
 - [x] Template Literals
-- [ ] Numeric Literals (Integers)
-- [ ] Punctuators
+- [x] Numeric Literals (Integers)
+- [x] Punctuators
 - [ ] Numeric Literals (Floats)
 - [ ] Regular Expressions
 - [ ] Remove delimeters from multiline comment tokens
 
 ### Punctuators
 
-```plaintext
-// Operators - Assignment
-    ASSIGN          // =
-    PLUS_ASSIGN     // +=
-    MINUS_ASSIGN    // -=
-    STAR_ASSIGN     // *=
-    DIV_ASSIGN      // /=
-    MOD_ASSIGN      // %=
-    EXP_ASSIGN      // **=
-    AND_ASSIGN      // &=
-    OR_ASSIGN       // |=
-    XOR_ASSIGN      // ^=
-    SHL_ASSIGN      // <<=
-    SHR_ASSIGN      // >>=
-    USHR_ASSIGN     // >>>=
+#### Operators - Assignment
 
-// Operators - Arithmetic
-    PLUS            // +
-    MINUS           // -
-    STAR            // *
-    DIV             // / -> This is going to be challenging
-    MOD             // %
-    EXP             // **
-    INC             // ++
-    DEC             // --
+- [x]    ASSIGN
+- [x]    PLUS_ASSIGN
+- [x]    MINUS_ASSIGN
+- [x]    STAR_ASSIGN
+- [x]    DIV_ASSIGN
+- [x]    MOD_ASSIGN
+- [x]    EXP_ASSIGN (**=)
+- [x]    AND_ASSIGN (&=)
+- [x]    OR_ASSIGN (|=)
+- [x]    XOR_ASSIGN (^=)
+- [x]    SHL_ASSIGN (<<=)
+- [x]    SHR_ASSIGN (>>=)
+- [x]    USHR_ASSIGN (>>>=)
 
-// Operators - Bitwise
-    AND             // &
-    OR              // |
-    XOR             // ^
-    SHL             // <<
-    SHR             // >>
-    USHR            // >>>
-    NOT             // ~
+#### Operators - Arithmetic
 
-// Operators - Logical
-    LAND            // &&
-    LOR             // ||
-    LNOT            // !
-    NULLISH         // ??
+- [x]    PLUS (+)
+- [x]    MINUS (-)
+- [x]    STAR (*)
+- [x]    DIV (/)
+- [x]    MOD (%)
+- [x]    EXP (**)
+- [x]    INC (++)
+- [x]    DEC (--)
 
-// Operators - Comparison
-    EQL             // ==
-    NEQ             // !=
-    STRICT_EQL      // ===
-    STRICT_NEQ      // !==
-    LSS             // <
-    GTR             // >
-    LEQ             // <=
-    GEQ             // >=
+#### Operators - Bitwise
 
-// Operators - Other
-    ARROW           // =>
-    QUESTION        // ?
-    QUESTION_DOT    // ?.
-    COLON           // :
-```
+- [x]    AND (&)
+- [x]    OR (|)
+- [x]    XOR (^)
+- [x]    SHL (<<)
+- [x]    SHR (>>)
+- [x]    USHR (>>>)
+- [x]    NOT (~)
+
+#### Operators - Logical
+
+- [x]    LAND (&&)
+- [x]    LOR (||)
+- [x]    LNOT (!)
+- [x]    NULLISH (??)
+
+#### Operators - Comparison
+
+- [x]    EQL (==)
+- [x]    NEQ (!=)
+- [x]    STRICT_EQL (===)
+- [x]    STRICT_NEQ (!==)
+- [x]    LSS (<)
+- [x]    GTR (>)
+- [x]    LEQ (<=)
+- [x]    GEQ (>=)
+
+#### Operators - Other
+
+- [x]    ARROW (=>)
+- [x]    QUESTION (?)
+- [x]    QUESTION_DOT (?.)
+- [x]    COLON (:)
 
 ## AST
 

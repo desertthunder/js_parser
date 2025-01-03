@@ -12,11 +12,11 @@ pub fn is_identifier_char(char: String) -> Bool {
 }
 
 pub fn is_punctuator_start(char: String) -> Bool {
-  let punctuators = [
+  [
     "+", "-", "*", "/", "%", "=", "!", "<", ">", "&", "|", "^", "~", "?", ":",
     ";", ",", ".", "(", ")", "[", "]", "{", "}",
   ]
-  list.contains(punctuators, char)
+  |> list.contains(char)
 }
 
 pub fn is_end_of_input(char: String) -> Bool {
