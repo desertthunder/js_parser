@@ -2,15 +2,22 @@ import gleam/list
 import gleam/string
 import gleeunit
 import gleeunit/should
-import js_parser
 import js_parser/lexer
+import simplifile as fs
+
+fn read_file(path) -> String {
+  case fs.read(from: path) {
+    Ok(contents) -> contents
+    Error(_) -> ""
+  }
+}
 
 pub fn main() {
   gleeunit.main()
 }
 
 pub fn read_file_test() {
-  let contents = js_parser.read_file("samples/js/parseFileTest.js")
+  let contents = read_file("samples/js/parseFileTest.js")
   case contents {
     "export function" as value <> _ ->
       should.be_true(string.starts_with(contents, value))
@@ -75,7 +82,7 @@ pub fn empty_template_literal_test() {
 }
 
 pub fn parse_jsdoc_comment_test() {
-  js_parser.read_file("samples/js/jsDocTest.js")
+  read_file("samples/js/jsDocTest.js")
   |> lexer.parse
   |> should.equal([
     lexer.MultiLineComment(
@@ -87,7 +94,7 @@ pub fn parse_jsdoc_comment_test() {
 }
 
 pub fn parse_multiline_comment_test() {
-  js_parser.read_file("samples/js/multilineComment.js")
+  read_file("samples/js/multilineComment.js")
   |> lexer.parse
   |> should.equal([
     lexer.MultiLineComment("/*\n * Go style multiline comment\n*/", True),
@@ -104,7 +111,7 @@ pub fn parse_simple_multiline_comment_test() {
 }
 
 pub fn parse_single_line_comment_with_cr_test() {
-  js_parser.read_file("samples/js/carriageComment.js")
+  read_file("samples/js/carriageComment.js")
   |> lexer.parse
   |> should.equal([
     lexer.SingleLineComment("// This is a comment"),
@@ -125,13 +132,13 @@ pub fn parse_single_line_comment_test() {
 }
 
 pub fn parse_class_with_private_identifier_test() {
-  js_parser.read_file("samples/js/privateAttrTest.js")
+  read_file("samples/js/privateAttrTest.js")
   |> lexer.parse
   |> list.contains(lexer.PrivateIdentifier(value: "#privateInformation"))
 }
 
 pub fn parse_file_test() {
-  js_parser.read_file("samples/js/parseFileTest.js")
+  read_file("samples/js/parseFileTest.js")
   |> lexer.parse
   |> should.equal([
     lexer.KeywordExport,
