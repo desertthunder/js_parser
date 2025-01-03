@@ -25,6 +25,33 @@ pub fn read_file_test() {
   }
 }
 
+pub fn parse_string_variable_assignment_test() {
+  "let some_var = 'value'"
+  |> js_parser.parse
+  |> should.equal([
+    js_parser.IdentifierName("let"),
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("some_var"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.StringLiteral("value", True),
+  ])
+}
+
+pub fn parse_punctuators_test() {
+  "instance_of_some_class.call();"
+  |> js_parser.parse
+  |> should.equal([
+    js_parser.IdentifierName("instance_of_some_class"),
+    js_parser.CharDot,
+    js_parser.IdentifierName("call"),
+    js_parser.CharOpenParen,
+    js_parser.CharCloseParen,
+    js_parser.CharSemicolon,
+  ])
+}
+
 pub fn numeric_literal_integers_test() {
   "1234"
   |> js_parser.parse

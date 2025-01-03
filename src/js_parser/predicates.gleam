@@ -7,7 +7,7 @@ pub fn is_letter(char: String) -> Bool {
   |> list.any(fn(c) { { c >= 65 && c <= 90 } || { c >= 97 && c <= 122 } })
 }
 
-pub fn is_identifier_start(char: String) -> Bool {
+pub fn is_identifier_char(char: String) -> Bool {
   char == "_" || char == "$" || is_letter(char)
 }
 

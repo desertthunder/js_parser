@@ -29,7 +29,6 @@ pub type Token {
   // Numbers
   NumericLiteral(value: String)
   // Special
-  Punctuator(value: String)
   WhiteSpace(value: String)
   LineTerminatorSequence(value: String)
 
@@ -85,6 +84,27 @@ pub type Token {
   CharOpenParen
   CharCloseParen
   CharWhitespace(value: String)
+
+  CharDot
+
+  Punctuator(Token)
+  CharAsterisk
+  CharMinus
+  CharPlus
+  CharEquals
+
+  PlusAssign
+  MinusAssign
+  StarAssign
+  DivAssign
+  ModAssign
+  ExpAssign
+  AndAssign
+  OrAssign
+  XorAssign
+  ShlAssign
+  ShrAssign
+  UshrAssign
 }
 
 pub type Character {
@@ -94,11 +114,6 @@ pub type Character {
   CharDoubleQuote
   CharForwardSlash
   CharBackslash
-  CharAsterisk
-  CharMinus
-  CharPlus
-  CharDot
-  CharEquals
 }
 
 pub type ParserState {
@@ -156,6 +171,23 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
     "]" <> rest -> advance_and_collect(state, rest, CharCloseBracket)
     "(" <> rest -> advance_and_collect(state, rest, CharOpenParen)
     ")" <> rest -> advance_and_collect(state, rest, CharCloseParen)
+    "+=" <> rest -> advance_and_collect(state, rest, Punctuator(PlusAssign))
+    "-=" <> rest -> advance_and_collect(state, rest, Punctuator(MinusAssign))
+    "*=" <> rest -> advance_and_collect(state, rest, Punctuator(StarAssign))
+    "/=" <> rest -> advance_and_collect(state, rest, Punctuator(DivAssign))
+    "%=" <> rest -> advance_and_collect(state, rest, Punctuator(ModAssign))
+    "**=" <> rest -> advance_and_collect(state, rest, Punctuator(ExpAssign))
+    "&=" <> rest -> advance_and_collect(state, rest, Punctuator(AndAssign))
+    "|=" <> rest -> advance_and_collect(state, rest, Punctuator(OrAssign))
+    "^=" <> rest -> advance_and_collect(state, rest, Punctuator(XorAssign))
+    "<<=" <> rest -> advance_and_collect(state, rest, Punctuator(ShlAssign))
+    ">>=" <> rest -> advance_and_collect(state, rest, Punctuator(ShrAssign))
+    ">>>=" <> rest -> advance_and_collect(state, rest, Punctuator(UshrAssign))
+    "=" <> rest -> advance_and_collect(state, rest, Punctuator(CharEquals))
+    "*" <> rest -> advance_and_collect(state, rest, Punctuator(CharAsterisk))
+    "-" <> rest -> advance_and_collect(state, rest, Punctuator(CharMinus))
+    "+" <> rest -> advance_and_collect(state, rest, Punctuator(CharPlus))
+    "." <> rest -> advance_and_collect(state, rest, CharDot)
     " " as c <> rest | "\t" as c <> rest ->
       advance_state(state, rest, state.offset + 1)
       |> parse_whitespace(c)
@@ -261,10 +293,12 @@ fn parse_identifier(state: ParserState, acc: String) -> #(ParserState, Token) {
     | "w" as c <> input
     | "x" as c <> input
     | "y" as c <> input
-    | "z" as c <> input -> {
+    | "z" as c <> input
+    | "_" as c <> input
+    | "$" as c <> input -> {
       let #(new_state, name) =
         advance_state(state, input, state.offset + 1)
-        |> collect_identifier(acc <> c, predicates.is_letter)
+        |> collect_identifier(acc <> c, predicates.is_identifier_char)
 
       case name {
         "#" as c <> rest -> #(new_state, PrivateIdentifier(value: c <> rest))
