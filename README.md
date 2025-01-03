@@ -40,7 +40,12 @@ pub fn main() {
 Should output:
 
 ```plaintext
-[KeywordExport, CharWhitespace(" "), KeywordFunction, CharWhitespace(" "), IdentifierName("someFunction"), CharOpenParen, CharCloseParen, CharWhitespace(" "), CharOpenBrace, LineTerminatorSequence("\n"), CharWhitespace("    "), IdentifierName("let"), CharWhitespace(" "), IdentifierName("someVar"), CharSemicolon, LineTerminatorSequence("\n"), CharCloseBrace, LineTerminatorSequence("\n")]
+[
+  KeywordExport, CharWhitespace(" "), KeywordFunction, CharWhitespace(" "), IdentifierName("someFunction"),CharOpenParen, CharCloseParen, CharWhitespace(" "), CharOpenBrace,
+  LineTerminatorSequence("\n"), CharWhitespace("    "),
+  IdentifierName("let"), CharWhitespace(" "), IdentifierName("someVar"), CharSemicolon,LineTerminatorSequence("\n"),
+  CharCloseBrace, LineTerminatorSequence("\n")
+]
 ```
 
 ```sh

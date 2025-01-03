@@ -24,3 +24,8 @@ pub fn is_end_of_input(char: String) -> Bool {
 
   list.contains(line_terminators, char)
 }
+
+// End of a template literal segment
+pub fn is_end_of_segment(char: String) -> Bool {
+  char == "$" || char == "`"
+}

@@ -5,11 +5,17 @@ import js_parser/predicates
 pub type Token {
   // String Literals
   StringLiteral(value: String, closed: Bool)
+
   // Template Literals
+  TemplateLiteral(components: List(Token))
+  EmptyTemplateLiteral
+
+  // TemplateSubstition
   NoSubstitutionTemplate(value: String, closed: Bool)
   TemplateHead(value: String)
   TemplateMiddle(value: String)
   TemplateTail(value: String, closed: Bool)
+
   // Regex
   RegularExpressionLiteral(value: String, closed: Bool)
   // Comments
@@ -117,6 +123,10 @@ pub fn parse_tokens(state: ParserState) -> List(Token) {
   }
 }
 
+pub fn append_token(state, token) -> ParserState {
+  ParserState(..state, tokens: [token, ..state.tokens])
+}
+
 // TODO: parse_template_literal
 // TODO: parse_comment_or_regex
 //       parse_hashbang_comment
@@ -130,6 +140,10 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
       case grapheme {
         "\"" -> parse_string_literal(new_state, "", "\"")
         "'" -> parse_string_literal(new_state, "", "'")
+        "`" -> {
+          let #(temp_state, temp_tokens) = parse_template_literal(new_state, [])
+          #(temp_state, TemplateLiteral(temp_tokens |> list.reverse))
+        }
         "_" as c | "$" as c -> parse_identifier(new_state, c)
         "/" -> parse_comment_or_regex(new_state)
         ":" -> #(new_state, CharColon)
@@ -155,6 +169,7 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
   }
 }
 
+// TODO: Unterminated string literals
 fn parse_string_literal(
   state: ParserState,
   acc: String,
@@ -381,6 +396,7 @@ fn collect_while(
   }
 }
 
+// TODO: separate lines to parse JSDoc
 fn parse_multi_line_comment(
   state: ParserState,
   acc: String,
@@ -407,6 +423,155 @@ fn parse_multi_line_comment(
       }
     }
     Error(_) -> #(state, acc)
+  }
+}
+
+fn collect_until(
+  state: ParserState,
+  acc: String,
+  predicate: fn(String) -> Bool,
+) -> #(ParserState, String) {
+  case string.pop_grapheme(state.input) {
+    Ok(#(grapheme, input)) -> {
+      case predicate(grapheme) {
+        True -> {
+          let new_state =
+            advance_state(state, grapheme <> input, state.offset + 1)
+          #(new_state, acc)
+        }
+        False -> {
+          state
+          |> advance_state(input, state.offset + 1)
+          |> collect_until(acc <> grapheme, predicate)
+        }
+      }
+    }
+    Error(_) -> #(state, acc)
+  }
+}
+
+// Template literals are wrapped around a list of Tokens
+// because of the variation in their structure.
+fn parse_template_literal(
+  state: ParserState,
+  acc: List(Token),
+) -> #(ParserState, List(Token)) {
+  case state.input {
+    // Terminated Template Literal
+    "`" <> rest -> {
+      case acc {
+        [] -> {
+          let new_state = advance_state(state, rest, state.offset + 1)
+          #(new_state, [EmptyTemplateLiteral])
+        }
+        _ -> {
+          let new_state = advance_state(state, rest, state.offset + 1)
+          #(new_state, acc)
+        }
+      }
+    }
+    // Start of substitution
+    // 1. Unterminated substition
+    // 2. Collect until }
+    "${" <> rest -> {
+      let new_state = advance_state(state, rest, state.offset + 2)
+      collect_until_close(new_state, acc)
+    }
+    // 1. Unterminated Template Literal
+    // 2. Head
+    // Collect until ${
+    // 3. Middle
+    // Collect until ${
+    // 4. Tail
+    // Collect until `
+    _ -> {
+      let #(sub_state, value) =
+        collect_until(state, "", predicates.is_end_of_segment)
+
+      case sub_state.input {
+        "${" <> rest -> {
+          case acc {
+            [] -> {
+              let next_acc = [TemplateHead(value), ..acc]
+              let #(new_state, new_acc) =
+                advance_state(sub_state, rest, sub_state.offset + 1)
+                |> collect_until_close(next_acc)
+              parse_template_literal(new_state, new_acc)
+            }
+            _ -> {
+              let next_acc = [TemplateMiddle(value), ..acc]
+              let #(new_state, new_acc) =
+                advance_state(sub_state, rest, sub_state.offset + 1)
+                |> collect_until_close(next_acc)
+
+              parse_template_literal(new_state, new_acc)
+            }
+          }
+        }
+        "`" <> rest -> {
+          case acc {
+            [] -> {
+              let final_state = advance_state(state, rest, sub_state.offset + 1)
+              #(final_state, [NoSubstitutionTemplate(value, True)])
+            }
+            _ -> {
+              let final_state = advance_state(state, rest, sub_state.offset + 1)
+              #(final_state, [TemplateTail(value, True), ..acc])
+            }
+          }
+        }
+        _ -> {
+          case acc {
+            [] -> #(sub_state, [NoSubstitutionTemplate(value, False)])
+            _ -> {
+              #(sub_state, [TemplateTail(value, False), ..acc])
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// fn peek_char() {
+//   todo
+// }
+
+// fn peek_tail() {
+//   todo
+// }
+
+// Recursively parse the substition until we reach the }
+fn collect_until_close(
+  state: ParserState,
+  acc: List(Token),
+) -> #(ParserState, List(Token)) {
+  let state_copy = state
+  let acc_copy = acc
+
+  case string.split_once(state_copy.input, "}") {
+    Ok(#(head, tail)) -> {
+      let offset = string.length(head) + 1
+      // Create a "slice" of state
+      let new_acc =
+        head
+        |> parse
+        // Merge the tokens into the original state
+        |> list.fold(acc_copy, fn(initial_acc, tok) { [tok, ..initial_acc] })
+
+      let new_state = advance_state(state_copy, tail, state.offset + offset)
+      #(new_state, new_acc)
+    }
+    Error(_) -> {
+      let offset = string.length(state_copy.input)
+      let new_acc =
+        state_copy
+        |> parse_tokens
+
+      let new_state = advance_state(state, "", state_copy.offset + offset)
+
+      #(new_state, new_acc)
+    }
   }
 }
 // fn parse_regular_expression(state: ParserState) -> Result(#(ParserState, Token), String) {

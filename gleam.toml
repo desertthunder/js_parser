@@ -6,10 +6,10 @@ repository = { type = "github", user = "desertthunder", repo = "js_parser" }
 # links = [{ title = "Website", href = "" }]
 
 [dependencies]
-argv = ">= 1.0.2 and < 2.0.0"
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
 gleam_regexp = ">= 1.0.0 and < 2.0.0"
-simplifile = ">= 2.2.0 and < 3.0.0"
 
 [dev-dependencies]
+argv = ">= 1.0.2 and < 2.0.0"
+simplifile = ">= 2.2.0 and < 3.0.0"
 gleeunit = ">= 1.0.0 and < 2.0.0"

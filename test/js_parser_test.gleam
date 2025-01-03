@@ -18,6 +18,62 @@ pub fn read_file_test() {
   }
 }
 
+pub fn open_tail_template_literal_with_substition_test() {
+  "`open tail template literal with a ${substition} in it"
+  |> lexer.parse
+  |> should.equal([
+    lexer.TemplateLiteral([
+      lexer.TemplateHead("open tail template literal with a "),
+      lexer.IdentifierName("substition"),
+      lexer.TemplateTail(" in it", False),
+    ]),
+  ])
+}
+
+pub fn closed_tail_template_literal_with_substition_test() {
+  "`closed tail template literal with a ${substition} in it`"
+  |> lexer.parse
+  |> should.equal([
+    lexer.TemplateLiteral([
+      lexer.TemplateHead("closed tail template literal with a "),
+      lexer.IdentifierName("substition"),
+      lexer.TemplateTail(" in it", True),
+    ]),
+  ])
+}
+
+pub fn no_substition_open_template_literal_test() {
+  "`open template literal without a substition"
+  |> lexer.parse
+  |> should.equal([
+    lexer.TemplateLiteral([
+      lexer.NoSubstitutionTemplate(
+        "open template literal without a substition",
+        False,
+      ),
+    ]),
+  ])
+}
+
+pub fn no_substition_closed_template_literal_test() {
+  "`closed template literal without a substition`"
+  |> lexer.parse
+  |> should.equal([
+    lexer.TemplateLiteral([
+      lexer.NoSubstitutionTemplate(
+        "closed template literal without a substition",
+        True,
+      ),
+    ]),
+  ])
+}
+
+pub fn empty_template_literal_test() {
+  "``"
+  |> lexer.parse
+  |> should.equal([lexer.TemplateLiteral([lexer.EmptyTemplateLiteral])])
+}
+
 pub fn parse_jsdoc_comment_test() {
   js_parser.read_file("samples/js/jsDocTest.js")
   |> lexer.parse
