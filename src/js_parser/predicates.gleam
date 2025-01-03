@@ -20,12 +20,16 @@ pub fn is_punctuator_start(char: String) -> Bool {
 }
 
 pub fn is_end_of_input(char: String) -> Bool {
-  let line_terminators = ["\n", "\r", "\r\n"]
-
-  list.contains(line_terminators, char)
+  ["\n", "\r", "\r\n"]
+  |> list.contains(char)
 }
 
 // End of a template literal segment
 pub fn is_end_of_segment(char: String) -> Bool {
   char == "$" || char == "`"
+}
+
+pub fn is_digit(char: String) -> Bool {
+  ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+  |> list.contains(char)
 }
