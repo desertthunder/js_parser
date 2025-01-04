@@ -277,7 +277,6 @@ fn advance_and_collect(
   #(new_state, token)
 }
 
-// TODO: Unterminated string literals
 fn parse_string_literal(
   state: ParserState,
   acc: String,
@@ -286,31 +285,22 @@ fn parse_string_literal(
   case state.input {
     "'" <> input | "\"" <> input -> {
       let new_state = advance_state(state, input, state.offset + 1)
-      parse_string_literal(new_state, acc, delimeter)
+      #(new_state, StringLiteral(acc, closed: True))
     }
-    "\\" as c <> input ->
-      case string.pop_grapheme(input) {
-        Error(_) -> {
-          let new_state = advance_state(state, input, state.offset + 1)
-          let value = acc <> c
-          #(new_state, StringLiteral(value, closed: True))
-        }
-        Ok(#(grapheme, input)) -> {
-          let new_state = advance_state(state, input, state.offset + 1)
-          let new_acc = acc <> grapheme
-          parse_string_literal(new_state, new_acc, delimeter)
-        }
-      }
     _ -> {
-      case string.pop_grapheme(state.input) {
-        Ok(#(grapheme, input)) -> {
-          let new_state = advance_state(state, input, state.offset + 1)
-          let new_acc = acc <> grapheme
-          parse_string_literal(new_state, new_acc, delimeter)
+      let predicate = fn(ch) { ch == delimeter }
+      let #(next_state, contents) =
+        advance_state(state, state.input, state.offset + 1)
+        |> collect_until(acc, predicate)
+      case next_state.input {
+        "'" <> _ | "\"" <> _ -> {
+          let new_state =
+            advance_state(next_state, next_state.input, next_state.offset + 1)
+
+          parse_string_literal(new_state, contents, delimeter)
         }
-        Error(_) -> {
-          let new_state = advance_state(state, state.input, state.offset + 1)
-          #(new_state, StringLiteral(acc, closed: True))
+        _ -> {
+          #(next_state, StringLiteral(contents, closed: False))
         }
       }
     }
@@ -471,9 +461,12 @@ fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
       }
     }
 
-    "/" <> input -> advance_and_collect(state, input, 1, CharBackslash)
-
     // Regular expression: /pattern/flags
+    "/" <> input -> {
+      advance_state(state, input, state.offset + 1)
+      |> parse_regular_expression("")
+    }
+    "/" -> #(state, CharBackslash)
     _ -> #(state, EOF)
   }
 }
@@ -722,5 +715,57 @@ fn parse_numeric_literal(
           #(state, NumericLiteral(acc))
         }
       }
+  }
+}
+
+fn parse_regular_expression(
+  state: ParserState,
+  acc: String,
+) -> #(ParserState, Token) {
+  // Until escape character
+  // let #(next_state, acc) =
+  //   advance_state(state, input, state.offset + 1)
+  //   |> collect_until("", fn(ch) { ch == "\\" })
+  // io.debug("Hit an escape character " <> acc)
+  // let #(new_state, contents) =
+  //   advance_state(next_state, next_state.input, state.offset + 1)
+  //   |> collect_until(acc, fn(ch) { ch == "/" })
+  // io.debug("Hit end " <> contents)
+
+  // #(new_state, RegularExpressionLiteral(contents, True))
+  case state.input {
+    "\\" as c <> input -> {
+      advance_state(state, input, state.offset + 1)
+      parse_regular_expression(state, acc <> c)
+    }
+    "/" -> {
+      #(state, RegularExpressionLiteral(acc, True))
+    }
+    input -> {
+      let #(next_state, next_acc) =
+        advance_state(state, input, state.offset + 1)
+        |> collect_until(acc, fn(ch) { ch == "\\" })
+
+      case next_state.input {
+        "\\" <> input -> {
+          advance_state(next_state, input, state.offset + 1)
+          |> parse_regular_expression(next_acc)
+        }
+        _ -> {
+          let #(new_state, new_acc) =
+            advance_state(next_state, input, next_state.offset + 1)
+            |> collect_until(acc, fn(ch) { ch == "/" })
+
+          case new_state.input {
+            "/" <> input -> {
+              let new_state =
+                advance_state(new_state, input, new_state.offset + 1)
+              #(new_state, RegularExpressionLiteral(new_acc, True))
+            }
+            _ -> #(new_state, RegularExpressionLiteral(new_acc, False))
+          }
+        }
+      }
+    }
   }
 }

@@ -3,7 +3,6 @@ version = "0.2.0"
 description = "A JavaScript parser written in Gleam"
 licences = ["MIT"]
 repository = { type = "github", user = "desertthunder", repo = "js_parser" }
-# links = [{ title = "Website", href = "" }]
 
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"

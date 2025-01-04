@@ -25,6 +25,119 @@ pub fn read_file_test() {
   }
 }
 
+pub fn regexp_test() {
+  read_file("samples/js/regex.js")
+  |> js_parser.parse
+  |> should.equal([
+    js_parser.KeywordExport,
+    js_parser.CharWhitespace(" "),
+    js_parser.KeywordFunction,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("regexTestCase"),
+    js_parser.CharOpenParen,
+    js_parser.IdentifierName("input"),
+    js_parser.CharCloseParen,
+    js_parser.CharWhitespace(" "),
+    js_parser.CharOpenBrace,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.KeywordConst,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("notLiteral"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.KeywordNew,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("RegExp"),
+    js_parser.CharOpenParen,
+    js_parser.StringLiteral("ab + c", True),
+    js_parser.CharCloseParen,
+    js_parser.CharSemicolon,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.KeywordConst,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("re"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.RegularExpressionLiteral("error+here?", True),
+    js_parser.CharSemicolon,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.IdentifierName("notLiteral"),
+    js_parser.CharDot,
+    js_parser.IdentifierName("test"),
+    js_parser.CharOpenParen,
+    js_parser.StringLiteral("something", True),
+    js_parser.CharCloseParen,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.IdentifierName("re"),
+    js_parser.CharDot,
+    js_parser.IdentifierName("test"),
+    js_parser.CharOpenParen,
+    js_parser.StringLiteral("something else", True),
+    js_parser.CharCloseParen,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharCloseBrace,
+    js_parser.LineTerminatorSequence("\n"),
+  ])
+}
+
+pub fn regexp_expanded_test() {
+  read_file("samples/js/regexExpanded.js")
+  |> js_parser.parse
+  |> should.equal([
+    js_parser.KeywordExport,
+    js_parser.CharWhitespace(" "),
+    js_parser.KeywordFunction,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("regexTestCase"),
+    js_parser.CharOpenParen,
+    js_parser.IdentifierName("input"),
+    js_parser.CharCloseParen,
+    js_parser.CharWhitespace(" "),
+    js_parser.CharOpenBrace,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.KeywordConst,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("re"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.RegularExpressionLiteral(
+      "^(?:d{3}|(d{3}))([-/.])d{3}1d{4}$",
+      True,
+    ),
+    js_parser.CharSemicolon,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.KeywordConst,
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("another"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.RegularExpressionLiteral("lol", True),
+    js_parser.CharSemicolon,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharWhitespace("    "),
+    js_parser.IdentifierName("re"),
+    js_parser.CharDot,
+    js_parser.IdentifierName("test"),
+    js_parser.CharOpenParen,
+    js_parser.IdentifierName("input"),
+    js_parser.CharCloseParen,
+    js_parser.LineTerminatorSequence("\n"),
+    js_parser.CharCloseBrace,
+    js_parser.LineTerminatorSequence("\n"),
+  ])
+}
+
 pub fn parse_string_variable_assignment_test() {
   "let some_var = 'value'"
   |> js_parser.parse
@@ -237,11 +350,25 @@ pub fn double_quote_string_literal_test() {
   |> should.equal([js_parser.StringLiteral("ok", True)])
 }
 
+pub fn unterminated_double_quote_string_literal_test() {
+  let input = "\"ok"
+  input
+  |> js_parser.parse
+  |> should.equal([js_parser.StringLiteral("ok", False)])
+}
+
 pub fn single_quote_string_literal_test() {
   let input = "'ok'"
   input
   |> js_parser.parse
   |> should.equal([js_parser.StringLiteral("ok", True)])
+}
+
+pub fn parse_unterminated_single_quote_string_literal_test() {
+  let input = "'ok"
+  input
+  |> js_parser.parse
+  |> should.equal([js_parser.StringLiteral("ok", False)])
 }
 
 pub fn parse_string_literal_with_escape_char_test() {
