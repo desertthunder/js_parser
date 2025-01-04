@@ -25,6 +25,42 @@ pub fn read_file_test() {
   }
 }
 
+pub fn parse_no_surrounding_whitespace_division_character_test() {
+  "let div = 4/4; "
+  |> js_parser.parse
+  |> should.equal([
+    js_parser.IdentifierName("let"),
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("div"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.NumericLiteral("4"),
+    js_parser.Punctuator(js_parser.CharBackslash),
+    js_parser.NumericLiteral("4"),
+    js_parser.CharSemicolon,
+  ])
+}
+
+pub fn parse_backslash_character_test() {
+  "let div = 4 / 2;"
+  |> js_parser.parse
+  |> should.equal([
+    js_parser.IdentifierName("let"),
+    js_parser.CharWhitespace(" "),
+    js_parser.IdentifierName("div"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharEquals),
+    js_parser.CharWhitespace(" "),
+    js_parser.NumericLiteral("4"),
+    js_parser.CharWhitespace(" "),
+    js_parser.Punctuator(js_parser.CharBackslash),
+    js_parser.CharWhitespace(" "),
+    js_parser.NumericLiteral("2"),
+    js_parser.CharSemicolon,
+  ])
+}
+
 pub fn regexp_test() {
   read_file("samples/js/regex.js")
   |> js_parser.parse
