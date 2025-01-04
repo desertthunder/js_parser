@@ -8,7 +8,11 @@ pub fn is_letter(char: String) -> Bool {
 }
 
 pub fn is_identifier_char(char: String) -> Bool {
-  char == "_" || char == "$" || is_letter(char)
+  char == "_" || char == "$" || is_letter(char) || is_number(char)
+}
+
+fn is_number(char) {
+  ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] |> list.contains(char)
 }
 
 pub fn is_punctuator_start(char: String) -> Bool {
