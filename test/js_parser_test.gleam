@@ -25,6 +25,16 @@ pub fn read_file_test() {
   }
 }
 
+pub fn hashbang_comment_test() {
+  "#!/usr/bin/env node"
+  |> js_parser.parse
+  |> should.equal([js_parser.HashbangComment("#!/usr/bin/env node")])
+}
+
+pub fn empty_hashbang_comment_test() {
+  "#!" |> js_parser.parse |> should.equal([js_parser.HashbangComment("#!")])
+}
+
 pub fn numeric_literal_floats_test() {
   "1.01"
   |> js_parser.parse
