@@ -15,7 +15,6 @@ pub type Token {
   RegularExpressionLiteral(value: String, closed: Bool)
   SingleLineComment(value: String)
   MultiLineComment(value: String, closed: Bool)
-  // TODO
   HashbangComment(value: String)
 
   IdentifierName(value: String)
@@ -171,6 +170,13 @@ fn parse_tokens(state: ParserState) -> List(Token) {
 fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
   case state.input {
     "" -> #(state, EOF)
+    "#!" as c <> rest -> {
+      let #(new_state, contents) =
+        advance_state(state, rest, 2)
+        |> collect_until(c, predicates.is_end_of_input)
+
+      #(new_state, HashbangComment(contents))
+    }
     "\"" <> rest ->
       advance_state(state, rest, state.offset + 1)
       |> parse_string_literal("", "\"")
@@ -263,17 +269,17 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
       |> parse_whitespace(c)
     "\n" as c <> rest | "\r" as c <> rest ->
       advance_and_collect(state, rest, 1, LineTerminatorSequence(value: c))
-    "0" as c <> rest
-    | "1" as c <> rest
-    | "2" as c <> rest
-    | "3" as c <> rest
-    | "4" as c <> rest
-    | "5" as c <> rest
-    | "6" as c <> rest
-    | "7" as c <> rest
-    | "8" as c <> rest
-    | "9" as c <> rest -> {
-      advance_state(state, rest, state.offset + 1) |> parse_numeric_literal(c)
+    "0" <> _
+    | "1" <> _
+    | "2" <> _
+    | "3" <> _
+    | "4" <> _
+    | "5" <> _
+    | "6" <> _
+    | "7" <> _
+    | "8" <> _
+    | "9" <> _ -> {
+      parse_numeric_literal(state, "")
     }
     _ -> {
       let assert Ok(#(grapheme, input)) = string.pop_grapheme(state.input)
@@ -609,9 +615,19 @@ fn parse_numeric_literal(
     | "6" as c <> rest
     | "7" as c <> rest
     | "8" as c <> rest
-    | "9" as c <> rest ->
-      advance_state(state, rest, state.offset + 1)
-      |> parse_numeric_literal(acc <> c)
+    | "9" as c <> rest -> {
+      let next_state = advance_state(state, rest, state.offset + 1)
+      case next_state.input {
+        "." as d <> input -> {
+          advance_state(next_state, input, next_state.offset + 1)
+          |> parse_numeric_literal(acc <> c <> d)
+        }
+        _ -> {
+          next_state
+          |> parse_numeric_literal(acc <> c)
+        }
+      }
+    }
     c ->
       case predicates.is_digit(c) {
         True -> {
