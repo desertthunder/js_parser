@@ -609,9 +609,19 @@ fn parse_numeric_literal(
     | "6" as c <> rest
     | "7" as c <> rest
     | "8" as c <> rest
-    | "9" as c <> rest ->
-      advance_state(state, rest, state.offset + 1)
-      |> parse_numeric_literal(acc <> c)
+    | "9" as c <> rest -> {
+      let next_state = advance_state(state, rest, state.offset + 1)
+      case next_state.input {
+        "." as d <> input -> {
+          advance_state(next_state, input, next_state.offset + 1)
+          |> parse_numeric_literal(acc <> c <> d)
+        }
+        _ -> {
+          next_state
+          |> parse_numeric_literal(acc <> c)
+        }
+      }
+    }
     c ->
       case predicates.is_digit(c) {
         True -> {

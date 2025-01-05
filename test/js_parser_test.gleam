@@ -25,6 +25,16 @@ pub fn read_file_test() {
   }
 }
 
+pub fn numeric_literal_floats_test() {
+  "1.01"
+  |> js_parser.parse
+  |> should.equal([js_parser.NumericLiteral("1.01")])
+}
+
+pub fn numeric_literal_float_test() {
+  "0.55" |> js_parser.parse |> should.equal([js_parser.NumericLiteral("0.55")])
+}
+
 pub fn parse_no_surrounding_whitespace_division_character_test() {
   "let div = 4/4; "
   |> js_parser.parse
