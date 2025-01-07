@@ -189,9 +189,9 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
         |> parse_template_literal([])
       #(temp_state, TemplateLiteral(temp_tokens |> list.reverse))
     }
-    "_" as c <> rest | "$" as c <> rest ->
+    "_" <> rest | "$" <> rest ->
       advance_state(state, rest, state.offset + 1)
-      |> parse_identifier(c)
+      |> parse_identifier
     "/=" <> rest -> advance_and_collect(state, rest, 2, Punctuator(DivAssign))
     "/ " <> rest ->
       advance_and_collect(state, " " <> rest, 1, Punctuator(CharBackslash))
@@ -264,9 +264,7 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
     }
     "%" <> rest -> advance_and_collect(state, rest, 1, Punctuator(CharMod))
     "." <> rest -> advance_and_collect(state, rest, 1, CharDot)
-    " " as c <> rest | "\t" as c <> rest ->
-      advance_state(state, rest, state.offset + 1)
-      |> parse_whitespace(c)
+    " " <> _ | "\t" <> _ -> parse_whitespace(state)
     "\n" as c <> rest | "\r" as c <> rest ->
       advance_and_collect(state, rest, 1, LineTerminatorSequence(value: c))
     "0" <> _
@@ -282,9 +280,7 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
       parse_numeric_literal(state, "")
     }
     _ -> {
-      let assert Ok(#(grapheme, input)) = string.pop_grapheme(state.input)
-      advance_state(state, input, state.offset + 1)
-      |> parse_identifier(grapheme)
+      parse_identifier(state)
     }
   }
 }
@@ -319,39 +315,38 @@ fn parse_string_literal(
   }
 }
 
-fn parse_identifier(state: ParserState, acc: String) -> #(ParserState, Token) {
+fn parse_identifier(state: ParserState) -> #(ParserState, Token) {
   case state.input {
-    "a" as c <> input
-    | "b" as c <> input
-    | "c" as c <> input
-    | "d" as c <> input
-    | "e" as c <> input
-    | "f" as c <> input
-    | "g" as c <> input
-    | "h" as c <> input
-    | "i" as c <> input
-    | "j" as c <> input
-    | "k" as c <> input
-    | "l" as c <> input
-    | "m" as c <> input
-    | "n" as c <> input
-    | "o" as c <> input
-    | "p" as c <> input
-    | "q" as c <> input
-    | "r" as c <> input
-    | "s" as c <> input
-    | "t" as c <> input
-    | "u" as c <> input
-    | "v" as c <> input
-    | "w" as c <> input
-    | "x" as c <> input
-    | "y" as c <> input
-    | "z" as c <> input
-    | "_" as c <> input
-    | "$" as c <> input -> {
+    "a" <> _
+    | "b" <> _
+    | "c" <> _
+    | "d" <> _
+    | "e" <> _
+    | "f" <> _
+    | "g" <> _
+    | "h" <> _
+    | "i" <> _
+    | "j" <> _
+    | "k" <> _
+    | "l" <> _
+    | "m" <> _
+    | "n" <> _
+    | "o" <> _
+    | "p" <> _
+    | "q" <> _
+    | "r" <> _
+    | "s" <> _
+    | "t" <> _
+    | "u" <> _
+    | "v" <> _
+    | "w" <> _
+    | "x" <> _
+    | "y" <> _
+    | "z" <> _
+    | "_" <> _
+    | "$" <> _ -> {
       let #(new_state, name) =
-        advance_state(state, input, state.offset + 1)
-        |> collect_while(acc <> c, predicates.is_identifier_char)
+        collect_while(state, predicates.is_identifier_char)
 
       case name {
         "#" as c <> rest -> #(new_state, PrivateIdentifier(value: c <> rest))
@@ -393,31 +388,25 @@ fn parse_identifier(state: ParserState, acc: String) -> #(ParserState, Token) {
         "while" -> #(new_state, KeywordWhile)
         "with" -> #(new_state, KeywordWith)
         "yield" -> #(new_state, KeywordYield)
-        _ -> #(new_state, IdentifierName(name))
+        rest -> #(new_state, IdentifierName(rest))
       }
     }
     _ -> {
-      case predicates.is_identifier_char(acc) {
-        True -> {
-          #(state, IdentifierName(acc))
-        }
-        False -> #(state, EOF)
+      let #(new_state, name) =
+        collect_while(state, predicates.is_identifier_char)
+      case name {
+        "" -> #(new_state, EOF)
+        _ -> #(new_state, IdentifierName(name))
       }
     }
   }
 }
 
-fn parse_whitespace(state: ParserState, acc: String) -> #(ParserState, Token) {
-  case string.pop_grapheme(state.input) {
-    Error(_) -> #(state, EOF)
-    Ok(#(grapheme, source)) ->
-      case grapheme {
-        " " | "\t" | "\n" | "\r" ->
-          state
-          |> advance_state(source, state.offset + 1)
-          |> parse_whitespace(acc <> grapheme)
-        _ -> #(state, CharWhitespace(value: acc))
-      }
+fn parse_whitespace(state: ParserState) -> #(ParserState, Token) {
+  let #(new_state, ws) = collect_while(state, predicates.is_whitespace)
+  case ws {
+    "" -> #(new_state, EOF)
+    _ -> #(new_state, CharWhitespace(ws))
   }
 }
 
@@ -690,31 +679,28 @@ fn parse_regular_expression(
 /// the caller.
 fn collect_while(
   state: ParserState,
-  acc: String,
   predicate: fn(String) -> Bool,
 ) -> #(ParserState, String) {
-  case string.pop_grapheme(state.input) {
-    Ok(#(grapheme, input)) -> {
-      case predicate(grapheme) {
-        False -> {
-          let new_state = advance_state(state, state.input, state.offset + 1)
-          #(new_state, acc)
-        }
-        True -> {
-          state
-          |> advance_state(input, state.offset + 1)
-          |> collect_while(acc <> grapheme, predicate)
-        }
-      }
-    }
-    Error(_) -> #(state, acc)
-  }
+  let input = string.to_graphemes(state.input)
+  let acc = input |> list.take_while(predicate)
+  let #(_, new_input) = list.split(input, list.length(acc))
+
+  #(
+    advance_state(
+      state,
+      merge_graphemes_into(new_input, ""),
+      state.offset + list.length(acc),
+    ),
+    merge_graphemes_into(acc, ""),
+  )
 }
 
 /// Similar to collect_while but instead includes the character
 /// used by the predicate function (the end of the sequence usually)
 /// so that the template literal collector is aware of which portion
 /// of the template the parser is working through (i.e. head, middle, tail)
+///
+/// TODO: Remove reliance on string.pop_grapheme
 fn collect_until(
   state: ParserState,
   acc: String,
@@ -773,4 +759,8 @@ fn collect_until_close(
       #(new_state, new_acc)
     }
   }
+}
+
+fn merge_graphemes_into(input, acc) {
+  list.fold(input, acc, fn(a, b) { a <> b })
 }
