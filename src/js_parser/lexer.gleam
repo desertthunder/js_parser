@@ -131,8 +131,8 @@ pub type Token {
   OperatorOptional
 }
 
-type ParserState {
-  ParserState(input: String, offset: Int, tokens: List(Token))
+type LexerState {
+  LexerState(input: String, offset: Int, tokens: List(Token))
 }
 
 pub fn parse(input: String) -> List(Token) {
@@ -141,33 +141,33 @@ pub fn parse(input: String) -> List(Token) {
   |> list.reverse
 }
 
-fn new_parser_state(input: String) -> ParserState {
-  ParserState(input: input, offset: 0, tokens: [])
+fn new_parser_state(input: String) -> LexerState {
+  LexerState(input: input, offset: 0, tokens: [])
 }
 
-fn advance_state(state: ParserState, input: String, offset: Int) -> ParserState {
-  ParserState(..state, input:, offset:)
+fn advance_state(state: LexerState, input: String, offset: Int) -> LexerState {
+  LexerState(..state, input:, offset:)
 }
 
 fn advance_and_collect(
-  state: ParserState,
+  state: LexerState,
   input: String,
   move_by: Int,
   token: Token,
-) -> #(ParserState, Token) {
+) -> #(LexerState, Token) {
   let new_state = advance_state(state, input, state.offset + move_by)
   #(new_state, token)
 }
 
-fn parse_tokens(state: ParserState) -> List(Token) {
+fn parse_tokens(state: LexerState) -> List(Token) {
   case parse_next_token(state) {
     #(_, EOF) -> state.tokens
     #(state, token) ->
-      parse_tokens(ParserState(..state, tokens: [token, ..state.tokens]))
+      parse_tokens(LexerState(..state, tokens: [token, ..state.tokens]))
   }
 }
 
-fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
+fn parse_next_token(state: LexerState) -> #(LexerState, Token) {
   case state.input {
     "" -> #(state, EOF)
     "#!" <> _ -> {
@@ -285,10 +285,10 @@ fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
 }
 
 fn parse_string_literal(
-  state: ParserState,
+  state: LexerState,
   acc: String,
   delimeter: String,
-) -> #(ParserState, Token) {
+) -> #(LexerState, Token) {
   case state.input {
     "'" <> input | "\"" <> input -> {
       let new_state = advance_state(state, input, state.offset + 1)
@@ -312,7 +312,7 @@ fn parse_string_literal(
   }
 }
 
-fn parse_identifier(state: ParserState) -> #(ParserState, Token) {
+fn parse_identifier(state: LexerState) -> #(LexerState, Token) {
   case state.input {
     "a" <> _
     | "b" <> _
@@ -399,7 +399,7 @@ fn parse_identifier(state: ParserState) -> #(ParserState, Token) {
   }
 }
 
-fn parse_whitespace(state: ParserState) -> #(ParserState, Token) {
+fn parse_whitespace(state: LexerState) -> #(LexerState, Token) {
   let #(new_state, ws) = collect_while(state, predicates.is_whitespace)
   case ws {
     "" -> #(new_state, EOF)
@@ -411,7 +411,7 @@ fn parse_whitespace(state: ParserState) -> #(ParserState, Token) {
 /// and regular expressions. Regular expressions and division are
 /// distinguished by the lack of, or presence of trailing whitespace,
 /// respectively. A number as the previous token also
-fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
+fn parse_comment_or_regex(state: LexerState) -> #(LexerState, Token) {
   case state.input {
     "//" <> _ -> {
       parse_single_line_comment(state)
@@ -439,7 +439,7 @@ fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
 }
 
 /// Collects a single line comment based on the end of input predicate
-fn parse_single_line_comment(state: ParserState) -> #(ParserState, Token) {
+fn parse_single_line_comment(state: LexerState) -> #(LexerState, Token) {
   let #(new_state, content) = collect_until(state, predicates.is_end_of_input)
   case new_state.input {
     "\n" <> input | "\r" <> input | "\r\n" <> input -> {
@@ -452,9 +452,9 @@ fn parse_single_line_comment(state: ParserState) -> #(ParserState, Token) {
 }
 
 fn parse_multi_line_comment(
-  state: ParserState,
+  state: LexerState,
   acc: String,
-) -> #(ParserState, Token) {
+) -> #(LexerState, Token) {
   let star_predicate = fn(end) { end == "*" }
   let backslash_predicate = fn(end) { end == "/" }
 
@@ -486,9 +486,9 @@ fn parse_multi_line_comment(
 /// because of the variation in their structure (head, middle, tail) and
 /// because substitions can be valid JavaScript expressions.
 fn parse_template_literal(
-  state: ParserState,
+  state: LexerState,
   acc: List(Token),
-) -> #(ParserState, List(Token)) {
+) -> #(LexerState, List(Token)) {
   case state.input {
     // Terminated Template Literal
     "`" <> rest -> {
@@ -566,10 +566,7 @@ fn parse_template_literal(
   }
 }
 
-fn parse_numeric_literal(
-  state: ParserState,
-  acc: String,
-) -> #(ParserState, Token) {
+fn parse_numeric_literal(state: LexerState, acc: String) -> #(LexerState, Token) {
   case state.input {
     "0" as c <> rest
     | "1" as c <> rest
@@ -606,9 +603,9 @@ fn parse_numeric_literal(
 }
 
 fn parse_regular_expression(
-  state: ParserState,
+  state: LexerState,
   acc: String,
-) -> #(ParserState, Token) {
+) -> #(LexerState, Token) {
   case state.input {
     "/" -> {
       #(state, RegularExpressionLiteral(acc, True))
@@ -646,9 +643,9 @@ fn parse_regular_expression(
 /// unterminated sequence, based on the predicate function provided by
 /// the caller.
 fn collect_while(
-  state: ParserState,
+  state: LexerState,
   predicate: fn(String) -> Bool,
-) -> #(ParserState, String) {
+) -> #(LexerState, String) {
   let input = string.to_graphemes(state.input)
   let acc = input |> list.take_while(predicate)
   let #(_, new_input) = list.split(input, list.length(acc))
@@ -669,9 +666,9 @@ fn collect_while(
 /// of the template the parser is working through (i.e. head, middle, tail)
 ///
 fn collect_until(
-  state: ParserState,
+  state: LexerState,
   predicate: fn(String) -> Bool,
-) -> #(ParserState, String) {
+) -> #(LexerState, String) {
   let input = string.to_graphemes(state.input)
   let acc =
     input
@@ -692,9 +689,9 @@ fn collect_until(
 /// substition. It recursively parses the substition until reaching the }
 /// character
 fn collect_until_close(
-  state: ParserState,
+  state: LexerState,
   acc: List(Token),
-) -> #(ParserState, List(Token)) {
+) -> #(LexerState, List(Token)) {
   let state_copy = state
   let acc_copy = acc
 
