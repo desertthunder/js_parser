@@ -170,10 +170,9 @@ fn parse_tokens(state: ParserState) -> List(Token) {
 fn parse_next_token(state: ParserState) -> #(ParserState, Token) {
   case state.input {
     "" -> #(state, EOF)
-    "#!" as c <> rest -> {
+    "#!" <> _ -> {
       let #(new_state, contents) =
-        advance_state(state, rest, 2)
-        |> collect_until(c, predicates.is_end_of_input)
+        collect_until(state, predicates.is_end_of_input)
 
       #(new_state, HashbangComment(contents))
     }
@@ -297,9 +296,7 @@ fn parse_string_literal(
     }
     _ -> {
       let predicate = fn(ch) { ch == delimeter }
-      let #(next_state, contents) =
-        advance_state(state, state.input, state.offset + 1)
-        |> collect_until(acc, predicate)
+      let #(next_state, contents) = collect_until(state, predicate)
       case next_state.input {
         "'" <> _ | "\"" <> _ -> {
           let new_state =
@@ -416,27 +413,12 @@ fn parse_whitespace(state: ParserState) -> #(ParserState, Token) {
 /// respectively. A number as the previous token also
 fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
   case state.input {
-    "//" as c <> input -> {
-      advance_state(state, input, state.offset + 2)
-      // Skip both slashes
-      |> parse_single_line_comment(c)
+    "//" <> _ -> {
+      parse_single_line_comment(state)
     }
-    "/*" as c <> input -> {
-      case input {
-        "*" as next_c <> next_source -> {
-          let #(new_state, content) =
-            advance_state(state, next_source, state.offset + 3)
-            |> parse_multi_line_comment(c <> next_c, fn(end) { end == "*/" })
-
-          #(new_state, MultiLineComment(content, True))
-        }
-        _ -> {
-          let #(new_state, content) =
-            advance_state(state, input, state.offset + 2)
-            |> parse_multi_line_comment(c, fn(end) { end == "*/" })
-          #(new_state, MultiLineComment(content, True))
-        }
-      }
+    "/*" as c <> rest -> {
+      advance_state(state, rest, state.offset + 2)
+      |> parse_multi_line_comment(c)
     }
     "/" <> input -> {
       case state.tokens {
@@ -457,13 +439,8 @@ fn parse_comment_or_regex(state: ParserState) -> #(ParserState, Token) {
 }
 
 /// Collects a single line comment based on the end of input predicate
-fn parse_single_line_comment(
-  state: ParserState,
-  result: String,
-) -> #(ParserState, Token) {
-  let #(new_state, content) =
-    collect_until(state, result, predicates.is_end_of_input)
-
+fn parse_single_line_comment(state: ParserState) -> #(ParserState, Token) {
+  let #(new_state, content) = collect_until(state, predicates.is_end_of_input)
   case new_state.input {
     "\n" <> input | "\r" <> input | "\r\n" <> input -> {
       advance_and_collect(new_state, input, 1, SingleLineComment(content))
@@ -477,29 +454,28 @@ fn parse_single_line_comment(
 fn parse_multi_line_comment(
   state: ParserState,
   acc: String,
-  predicate: fn(String) -> Bool,
-) -> #(ParserState, String) {
-  case string.pop_grapheme(state.input) {
-    Ok(#(grapheme, input)) -> {
-      case input {
-        "*/" as c <> source ->
-          case predicate(c) {
-            True -> {
-              let new_state = advance_state(state, source, state.offset + 1)
-              #(new_state, acc <> grapheme <> c)
-            }
-            False -> {
-              let new_state = advance_state(state, input, state.offset + 1)
-              parse_multi_line_comment(new_state, acc <> grapheme, predicate)
-            }
-          }
-        _ -> {
-          let new_state = advance_state(state, input, state.offset + 1)
-          parse_multi_line_comment(new_state, acc <> grapheme, predicate)
-        }
-      }
+) -> #(ParserState, Token) {
+  let star_predicate = fn(end) { end == "*" }
+  let backslash_predicate = fn(end) { end == "/" }
+
+  let #(star_state, star_contents) = collect_until(state, star_predicate)
+  let #(slash_state, slash_contents) =
+    collect_until(star_state, backslash_predicate)
+
+  case slash_state.input {
+    "/" <> rest -> {
+      let new_state = advance_state(slash_state, rest, slash_state.offset + 1)
+      #(
+        new_state,
+        MultiLineComment(acc <> star_contents <> slash_contents <> "/", True),
+      )
     }
-    Error(_) -> #(state, acc)
+    _ -> {
+      #(
+        slash_state,
+        MultiLineComment(acc <> star_contents <> slash_contents, False),
+      )
+    }
   }
 }
 
@@ -543,7 +519,7 @@ fn parse_template_literal(
     // Collect until `
     _ -> {
       let #(sub_state, value) =
-        collect_until(state, "", predicates.is_end_of_segment)
+        collect_until(state, predicates.is_end_of_segment)
 
       case sub_state.input {
         "${" <> rest -> {
@@ -634,27 +610,19 @@ fn parse_regular_expression(
   acc: String,
 ) -> #(ParserState, Token) {
   case state.input {
-    "\\" as c <> input -> {
-      advance_state(state, input, state.offset + 1)
-      parse_regular_expression(state, acc <> c)
-    }
     "/" -> {
       #(state, RegularExpressionLiteral(acc, True))
     }
-    input -> {
-      let #(next_state, next_acc) =
-        advance_state(state, input, state.offset + 1)
-        |> collect_until(acc, fn(ch) { ch == "\\" })
+    _ -> {
+      let #(next_state, next_acc) = collect_until(state, fn(ch) { ch == "\\" })
 
       case next_state.input {
         "\\" <> input -> {
           advance_state(next_state, input, state.offset + 1)
-          |> parse_regular_expression(next_acc)
+          |> parse_regular_expression(acc <> next_acc)
         }
         _ -> {
-          let #(new_state, new_acc) =
-            advance_state(next_state, input, next_state.offset + 1)
-            |> collect_until(acc, fn(ch) { ch == "/" })
+          let #(new_state, new_acc) = collect_until(state, fn(ch) { ch == "/" })
 
           case new_state.input {
             "/" <> input -> {
@@ -662,7 +630,7 @@ fn parse_regular_expression(
                 new_state,
                 input,
                 1,
-                RegularExpressionLiteral(new_acc, True),
+                RegularExpressionLiteral(acc <> new_acc, True),
               )
             }
             _ -> #(new_state, RegularExpressionLiteral(new_acc, False))
@@ -700,29 +668,24 @@ fn collect_while(
 /// so that the template literal collector is aware of which portion
 /// of the template the parser is working through (i.e. head, middle, tail)
 ///
-/// TODO: Remove reliance on string.pop_grapheme
 fn collect_until(
   state: ParserState,
-  acc: String,
   predicate: fn(String) -> Bool,
 ) -> #(ParserState, String) {
-  case string.pop_grapheme(state.input) {
-    Ok(#(grapheme, input)) -> {
-      case predicate(grapheme) {
-        True -> {
-          let new_state =
-            advance_state(state, grapheme <> input, state.offset + 1)
-          #(new_state, acc)
-        }
-        False -> {
-          state
-          |> advance_state(input, state.offset + 1)
-          |> collect_until(acc <> grapheme, predicate)
-        }
-      }
-    }
-    Error(_) -> #(state, acc)
-  }
+  let input = string.to_graphemes(state.input)
+  let acc =
+    input
+    |> list.take_while(fn(ch) { !predicate(ch) })
+  let #(_, new_input) = list.split(input, list.length(acc))
+
+  #(
+    advance_state(
+      state,
+      merge_graphemes_into(new_input, ""),
+      state.offset + list.length(acc),
+    ),
+    merge_graphemes_into(acc, ""),
+  )
 }
 
 /// A helper function used to collect the tokens within a template literal
