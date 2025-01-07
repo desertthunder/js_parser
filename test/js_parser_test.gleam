@@ -59,6 +59,7 @@ pub fn parse_no_surrounding_whitespace_division_character_test() {
     js_parser.Punctuator(js_parser.CharBackslash),
     js_parser.NumericLiteral("4"),
     js_parser.CharSemicolon,
+    js_parser.CharWhitespace(" "),
   ])
 }
 

@@ -37,3 +37,7 @@ pub fn is_digit(char: String) -> Bool {
   ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
   |> list.contains(char)
 }
+
+pub fn is_whitespace(char) {
+  [" ", "\t", "\n", "\r"] |> list.contains(char)
+}
